@@ -7,7 +7,7 @@ services:
       - "1883:1883"
     volumes:
       # Mount config/mosquitto (which contains mosquitto.conf) into the container's config dir
-      - ${SIGNALS_ROOT:-.}/config/mosquitto:/mosquitto/config:ro
+      - ${SIGNALS_ROOT:-.}/config/mosquitto:/mosquitto/config
 
   seq:
     image: datalust/seq:latest
@@ -29,7 +29,7 @@ services:
       - "9090:9090"
     volumes:
       # Mount config/prometheus/prometheus.yml as the main Prometheus config file
-      - ${SIGNALS_ROOT:-.}/config/prometheus:/etc/prometheus:ro
+      - ${SIGNALS_ROOT:-.}/config/prometheus:/etc/prometheus
 
   grafana:
     image: grafana/grafana:latest
@@ -40,7 +40,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       # Treat config/grafana as the "datasources" provisioning folder
-      - ${SIGNALS_ROOT:-.}/config/grafana:/etc/grafana/provisioning/datasources:ro
+      - ${SIGNALS_ROOT:-.}/config/grafana:/etc/grafana/provisioning/datasources
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 
