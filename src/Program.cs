@@ -38,7 +38,9 @@ public sealed record SignalEvent(
     string RawTopic,
     JsonElement RawPayload,
     DeviceKind DeviceKind,
-    EventCategory EventCategory);
+    EventCategory EventCategory,
+    JsonElement? RawPayload
+    );
 
 class Program
 {
