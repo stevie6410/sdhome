@@ -67,7 +67,7 @@ services:
 
   signals:
     build:
-      context: ./src/Signals
+      context: ./src
       dockerfile: Dockerfile
     container_name: signals
     restart: unless-stopped
