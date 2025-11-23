@@ -69,7 +69,7 @@ services:
       postgres:
         condition: service_healthy
       mosquitto:
-        condition: service_healthy
+        condition: service_started
       seq:
         condition: service_started
       prometheus:
