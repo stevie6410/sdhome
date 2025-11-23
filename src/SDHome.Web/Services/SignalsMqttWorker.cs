@@ -1,67 +1,67 @@
-﻿using global::SDHome.Web.Models;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MQTTnet;
 using SDHome.Web.Models;
-using Serilog;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace SDHome.Web.Services
+namespace SDHome.Web.Services;
+
+public class SignalsMqttWorker : BackgroundService
 {
-    public class SignalsMqttWorker : BackgroundService
+    private readonly ILogger<SignalsMqttWorker> _logger;
+    private readonly ISignalsService _signalsService;
+    private readonly MqttOptions _mqttOptions;
+
+    public SignalsMqttWorker(
+        ISignalsService signalsService,
+        IOptions<MqttOptions> mqttOptions,
+        ILogger<SignalsMqttWorker> logger)
     {
-        private readonly Microsoft.Extensions.Logging.ILogger _log = Log.ForContext<SignalsMqttWorker>();
-        private readonly ISignalsService _signalsService;
-        private readonly MqttOptions _mqttOptions;
+        _signalsService = signalsService;
+        _mqttOptions = mqttOptions.Value;
+        _logger = logger;
+    }
 
-        public SignalsMqttWorker(
-            ISignalsService signalsService,
-            IOptions<MqttOptions> mqttOptions)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        var factory = new MqttClientFactory();
+        var client = factory.CreateMqttClient();
+
+        var options = new MqttClientOptionsBuilder()
+            .WithClientId("SDHomeSignals-" + Guid.NewGuid())
+            .WithTcpServer(_mqttOptions.Host, _mqttOptions.Port)
+            .WithCleanSession()
+            .Build();
+
+        client.ConnectedAsync += _ =>
         {
-            _signalsService = signalsService;
-            _mqttOptions = mqttOptions.Value;
-        }
+            _logger.LogInformation("✅ Connected to MQTT broker {Host}:{Port}", _mqttOptions.Host, _mqttOptions.Port);
+            return Task.CompletedTask;
+        };
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        client.DisconnectedAsync += _ =>
         {
-            var factory = new MqttClientFactory();
-            var client = factory.CreateMqttClient();
+            _logger.LogWarning("⚠️ Disconnected from MQTT broker.");
+            return Task.CompletedTask;
+        };
 
-            var options = new MqttClientOptionsBuilder()
-                .WithClientId("SDHomeSignals-" + Guid.NewGuid())
-                .WithTcpServer(_mqttOptions.Host, _mqttOptions.Port)
-                .WithCleanSession()
-                .Build();
+        client.ApplicationMessageReceivedAsync += async e =>
+        {
+            var topic = e.ApplicationMessage.Topic;
+            var payload = e.ApplicationMessage.ConvertPayloadToString();
 
-            client.ConnectedAsync += _ =>
-            {
-                _log.Information("✅ Connected to MQTT broker {Host}:{Port}", _mqttOptions.Host, _mqttOptions.Port);
-                return Task.CompletedTask;
-            };
+            await _signalsService.HandleMqttMessageAsync(topic, payload, stoppingToken);
+        };
 
-            client.DisconnectedAsync += _ =>
-            {
-                _log.Warning("⚠️ Disconnected from MQTT broker.");
-                return Task.CompletedTask;
-            };
+        await client.ConnectAsync(options, stoppingToken);
 
-            client.ApplicationMessageReceivedAsync += async e =>
-            {
-                var topic = e.ApplicationMessage.Topic;
-                var payload = e.ApplicationMessage.ConvertPayloadToString();
+        var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
+            .WithTopicFilter(f => f.WithTopic(_mqttOptions.TopicFilter))
+            .Build();
 
-                await _signalsService.HandleMqttMessageAsync(topic, payload, stoppingToken);
-            };
-
-            await client.ConnectAsync(options, stoppingToken);
-
-            var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
-                .WithTopicFilter(f => f.WithTopic(_mqttOptions.TopicFilter))
-                .Build();
-
-            await client.SubscribeAsync(subscribeOptions, stoppingToken);
-            _log.Information("🔔 Subscribed to MQTT topic filter {TopicFilter}", _mqttOptions.TopicFilter);
-        }
+        await client.SubscribeAsync(subscribeOptions, stoppingToken);
+        _logger.LogInformation("🔔 Subscribed to MQTT topic filter {TopicFilter}", _mqttOptions.TopicFilter);
     }
 }

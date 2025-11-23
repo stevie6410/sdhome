@@ -1,24 +1,12 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Options;
 using SDHome.Web.Data;
 using SDHome.Web.Mappers;
 using SDHome.Web.Models;
 using SDHome.Web.Services;
-using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Optional: wire Serilog similarly to your old console app
-builder.Host.UseSerilog((ctx, cfg) =>
-{
-    var seqUrl = ctx.Configuration["Logging:SeqUrl"] ?? "http://localhost:5341";
-
-    cfg.MinimumLevel.Information()
-        .Enrich.FromLogContext()
-        .WriteTo.Console(
-            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-        .WriteTo.Seq(seqUrl);
-});
 
 // Bind config to options
 builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Signals:Mqtt"));
@@ -31,7 +19,7 @@ builder.Services.Configure<MetricsOptions>(builder.Configuration.GetSection("Met
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
-// 🔌 Repository (write + read)
+// --- Connection string from config ---
 var postgresOptions = builder.Configuration
     .GetSection("Signals:Postgres")
     .Get<PostgresOptions>()
@@ -42,8 +30,9 @@ var connectionString =
     ?? Environment.GetEnvironmentVariable("POSTGRES_CONNECTION_STRING")
     ?? throw new InvalidOperationException("Signals connection string not configured");
 
-builder.Services.AddSingleton<ISignalEventsRepository>(
-    _ => new PostgeSqlSignalEventsRepository(connectionString));
+// 🔌 Repository (read + write)
+builder.Services.AddSingleton<ISignalEventsRepository>(_ => new PostgresSignalEventsRepository(connectionString));
+// ^^^ make sure this class name matches whatever is in Data/PostgeSqlSignalEventsRepository.cs
 
 // 🔌 Mapper (MQTT payload → SignalEvent)
 builder.Services.AddSingleton<ISignalEventMapper, SignalEventMapper>();
