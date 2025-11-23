@@ -7,6 +7,11 @@ services:
     volumes:
       # mosquitto.conf is now in src/Signals
       - ${SIGNALS_ROOT:-.}/src/Signals/mosquitto.conf
+    healthcheck:
+      test: ["CMD", "sh", "-c", "mosquitto_sub -h localhost -t '$SYS/#' -C 1 -W 3 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   seq:
     image: datalust/seq:latest
@@ -68,7 +73,7 @@ services:
       postgres:
         condition: service_healthy
       mosquitto:
-        condition: service_started
+        condition: service_healthy
       seq:
         condition: service_started
       prometheus:
