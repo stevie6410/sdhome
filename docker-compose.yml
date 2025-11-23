@@ -29,7 +29,7 @@ services:
       - "9090:9090"
     volumes:
       # Mount config/prometheus/prometheus.yml as the main Prometheus config file
-      - ${SIGNALS_ROOT:-.}/config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${SIGNALS_ROOT:-.}/config/prometheus:/etc/prometheus:ro
 
   grafana:
     image: grafana/grafana:latest
