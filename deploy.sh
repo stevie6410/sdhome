@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /home/signals
+cd /home/signals  # adjust if needed
 
-echo "[deploy] Pulling latest changes..."
+echo "[deploy] Fetching latest code..."
 git fetch origin
 git reset --hard origin/main
 
 echo "[deploy] Pulling latest images..."
 docker compose pull
 
-echo "[deploy] Recreating containers..."
+echo "[deploy] Building Signals image..."
+docker compose build signals
+
+echo "[deploy] Applying stack..."
 docker compose up -d --remove-orphans
 
-echo "[deploy] Done."
+echo "[deploy] Deployment complete."
