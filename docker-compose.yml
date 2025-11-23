@@ -90,7 +90,7 @@ services:
     image: koenkk/zigbee2mqtt
     container_name: zigbee2mqtt
     volumes:
-      - ${SIGNALS_ROOT:-.}/src/Signals/zigbee2mqtt-data:/app/data
+      - .config/zigbee:/app/data
     environment:
       - TZ=Europe/London
     devices:
