@@ -21,4 +21,4 @@ jobs:
 
       - name: Run deploy script
         run: |
-          /home/signals/deploy.sh
+          bash /home/signals/deploy.sh
