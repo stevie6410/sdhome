@@ -87,7 +87,7 @@
       Signals__Webhooks__Main: "http://n8n:5678/webhook/signals/event"
       Signals__Webhooks__Test: "http://n8n:5678/webhook-test/signals/event"
 
-      Logging__SeqUrl: "http://seq"
+      Logging__SeqUrl: "http://localhost/seq"
 
     ports:
       - "8090:8080"
