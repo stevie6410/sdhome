@@ -133,6 +133,7 @@
       - "80:80"       # add 443 later for HTTPS
     depends_on:
       - n8n
+      - zigbee2mqtt
       - seq
       - grafana
       - prometheus
