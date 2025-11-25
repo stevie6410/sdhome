@@ -50,7 +50,7 @@ namespace SDHome.Lib.Services
             CancellationToken cancellationToken = default)
         {
             // If you want to ignore bridge noise, uncomment:
-            // if (topic.StartsWith("sdhome/bridge", StringComparison.OrdinalIgnoreCase)) return;
+            if (topic.StartsWith("sdhome/bridge", StringComparison.OrdinalIgnoreCase)) return;
 
             if (string.IsNullOrWhiteSpace(payload))
             {
