@@ -1,0 +1,64 @@
+<div class="layout-container">
+  <!-- Side Navigation -->
+  <aside class="layout-sidebar">
+    <div class="sidebar-header">
+      <i class="pi pi-bolt logo-icon"></i>
+      <span class="app-title">SDHome</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <p-menu [model]="menuItems" styleClass="sidebar-menu" />
+    </nav>
+
+    <div class="sidebar-footer">
+      <p-button
+        [icon]="themeIcon()"
+        [text]="true"
+        [rounded]="true"
+        (onClick)="themeService.toggleTheme()"
+        [aria-label]="'Switch to ' + (themeService.theme() === 'light' ? 'dark' : 'light') + ' mode'"
+        styleClass="theme-toggle"
+      />
+    </div>
+  </aside>
+
+  <!-- Mobile Drawer -->
+  <p-drawer [(visible)]="drawerVisible" [modal]="true" position="left">
+    <ng-template pTemplate="header">
+      <div class="drawer-header">
+        <i class="pi pi-bolt logo-icon"></i>
+        <span class="app-title">SDHome</span>
+      </div>
+    </ng-template>
+
+    <p-menu [model]="menuItems" styleClass="w-full border-none" />
+  </p-drawer>
+
+  <!-- Main Content Area -->
+  <div class="layout-main">
+    <!-- Top Bar (Mobile) -->
+    <header class="layout-topbar">
+      <p-button
+        icon="pi pi-bars"
+        [text]="true"
+        [rounded]="true"
+        (onClick)="toggleDrawer()"
+        aria-label="Toggle menu"
+        styleClass="menu-toggle"
+      />
+      <span class="topbar-title">SDHome</span>
+      <p-button
+        [icon]="themeIcon()"
+        [text]="true"
+        [rounded]="true"
+        (onClick)="themeService.toggleTheme()"
+        [aria-label]="'Switch to ' + (themeService.theme() === 'light' ? 'dark' : 'light') + ' mode'"
+      />
+    </header>
+
+    <!-- Page Content -->
+    <main class="layout-content">
+      <router-outlet />
+    </main>
+  </div>
+</div>

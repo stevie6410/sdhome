@@ -17,7 +17,7 @@ export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL');
 @Injectable({
     providedIn: 'root'
 })
-export class SdHomeClient {
+export class ReadingsApiService {
     private http: HttpClient;
     private baseUrl: string;
     protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
@@ -155,7 +155,7 @@ export class SdHomeClient {
 @Injectable({
     providedIn: 'root'
 })
-export class SdHomeClient {
+export class SignalsApiService {
     private http: HttpClient;
     private baseUrl: string;
     protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
@@ -228,7 +228,7 @@ export class SdHomeClient {
 @Injectable({
     providedIn: 'root'
 })
-export class SdHomeClient {
+export class TriggersApiService {
     private http: HttpClient;
     private baseUrl: string;
     protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;

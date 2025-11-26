@@ -1,0 +1,14 @@
+{
+  "/api": {
+    "target": "https://localhost:5000",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/swagger": {
+    "target": "https://localhost:5000",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}

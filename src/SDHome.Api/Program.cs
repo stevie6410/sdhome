@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.SpaServices.Extensions;
 using SDHome.Lib.Data;
 using SDHome.Lib.Mappers;
 using SDHome.Lib.Models;
@@ -97,5 +98,22 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Serve Angular SPA
+app.UseStaticFiles();
+
+if (!app.Environment.IsEnvironment("NSwag"))
+{
+    app.UseSpa(spa =>
+    {
+        spa.Options.SourcePath = "../ClientApp";
+
+        if (app.Environment.IsDevelopment())
+        {
+            // Proxy to Angular dev server during development
+            spa.UseProxyToSpaDevelopmentServer("http://localhost:4200");
+        }
+    });
+}
 
 app.Run();

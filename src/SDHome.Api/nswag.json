@@ -20,7 +20,7 @@
   },
   "codeGenerators": {
     "openApiToTypeScriptClient": {
-      "className": "SdHomeClient",
+      "className": "{controller}ApiService",
       "moduleName": "",
       "namespace": "",
       "typeScriptVersion": 5.0,
