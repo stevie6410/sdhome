@@ -38,10 +38,12 @@ builder.Services.Configure<MetricsOptions>(builder.Configuration.GetSection("Met
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
 
 // Repositories
 builder.Services.AddSingleton<ISignalEventsRepository>(_ =>
+    new SqlServerSignalEventsRepository(connectionString));
+builder.Services.AddSingleton<SqlServerSignalEventsRepository>(_ =>
     new SqlServerSignalEventsRepository(connectionString));
 
 builder.Services.AddSingleton<ITriggerEventsRepository>(_ =>
@@ -60,7 +62,12 @@ builder.Services.AddSingleton<ISignalEventProjectionService, SignalEventProjecti
 // HttpClient + main SignalsService + MQTT worker
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ISignalsService, SignalsService>();
-builder.Services.AddHostedService<SignalsMqttWorker>();
+
+// Only add background workers if not in NSwag environment
+if (!builder.Environment.IsEnvironment("NSwag"))
+{
+    builder.Services.AddHostedService<SignalsMqttWorker>();
+}
 
 var app = builder.Build();
 
@@ -68,10 +75,17 @@ app.UseCors("DevCors");
 
 // Ensure SQL Server table/indexes exist at startup
 // (EnsureCreatedAsync should now include creation of trigger_events and sensor_readings as well)
-using (var scope = app.Services.CreateScope())
+// Only ensure DB in normal runtime, not during NSwag or design-time builds
+if (!app.Environment.IsEnvironment("NSwag"))
 {
-    var repo = scope.ServiceProvider.GetRequiredService<ISignalEventsRepository>();
-    await repo.EnsureCreatedAsync();
+    using (var scope = app.Services.CreateScope())
+    {
+        var repo = scope.ServiceProvider.GetRequiredService<ISignalEventsRepository>() as SqlServerSignalEventsRepository;
+        if (repo != null)
+        {
+            repo.EnsureCreatedAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+    }
 }
 
 // Configure the HTTP request pipeline.
