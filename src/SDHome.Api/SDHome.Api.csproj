@@ -30,7 +30,7 @@
 
   <!-- Include Angular dist files in the project -->
   <ItemGroup>
-    <DistFiles Include="..\ClientApp\dist\browser\**" />
+    <DistFiles Include="..\ClientApp\dist\ClientApp\browser\**" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -45,7 +45,7 @@
     <Exec WorkingDirectory="$(SpaRoot)" Command="npm run build:prod" />
 
     <ItemGroup>
-      <DistFiles Include="$(SpaRoot)dist\browser\**" />
+      <DistFiles Include="$(SpaRoot)dist\ClientApp\browser\**" />
       <ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
         <RelativePath>wwwroot\%(RecursiveDir)%(FileName)%(Extension)</RelativePath>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
