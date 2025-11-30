@@ -156,6 +156,9 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
     Predicate = _ => false // Just checks if the app is running
 });
 
+// Serve static files (Angular dist)
+app.UseStaticFiles();
+
 // Serve Angular SPA - must be after all API/hub endpoints
 app.UseWhen(
     context => !context.Request.Path.StartsWithSegments("/api") &&
@@ -164,7 +167,6 @@ app.UseWhen(
                !context.Request.Path.StartsWithSegments("/hubs"),
     spaApp =>
     {
-        spaApp.UseStaticFiles();
         spaApp.UseSpa(spa =>
         {
             spa.Options.SourcePath = "../ClientApp";

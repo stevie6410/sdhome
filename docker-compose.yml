@@ -102,6 +102,8 @@
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       
+      ConnectionStrings__DefaultConnection: "Server=192.168.0.191;Database=signals;User Id=sa;Password=TechDevs!0;Encrypt=True;TrustServerCertificate=True;"
+      
       Signals__Mqtt__Host: mosquitto
       Signals__Mqtt__Port: "1883"
 
