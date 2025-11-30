@@ -13,14 +13,14 @@
       "msBuildOutputPath": null,
       "verbose": true,
       "workingDirectory": null,
-      "aspNetCoreEnvironment": "Development",
+      "aspNetCoreEnvironment": "NSwag",
       "output": "bin/Debug/net8.0/swagger.json",
       "newLineBehavior": "Auto"
     }
   },
   "codeGenerators": {
     "openApiToTypeScriptClient": {
-      "className": "SdHomeClient",
+      "className": "{controller}ApiService",
       "moduleName": "",
       "namespace": "",
       "typeScriptVersion": 5.0,
