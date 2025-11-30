@@ -5,20 +5,23 @@ using SDHome.Lib.Models;
 
 namespace SDHome.Lib.Services;
 
-public class SignalEventProjectionService(SignalsDbContext db) : ISignalEventProjectionService
+public class SignalEventProjectionService(
+    SignalsDbContext db,
+    IRealtimeEventBroadcaster broadcaster) : ISignalEventProjectionService
 {
-    public async Task ProjectAsync(SignalEvent ev, CancellationToken cancellationToken = default)
+    public async Task<ProjectedEventData> ProjectAsync(SignalEvent ev, CancellationToken cancellationToken = default)
     {
         // Example: handle motion sensor events
         if (ev.Capability == "motion" && ev.EventType == "detection")
         {
-            await HandleMotionEventAsync(ev, cancellationToken);
+            return await HandleMotionEventAsync(ev, cancellationToken);
         }
 
         // Later: handle other capabilities (contact, button, temp-only devices, etc.)
+        return new ProjectedEventData(null, []);
     }
 
-    private async Task HandleMotionEventAsync(SignalEvent ev, CancellationToken ct)
+    private async Task<ProjectedEventData> HandleMotionEventAsync(SignalEvent ev, CancellationToken ct)
     {
         var payload = ev.RawPayload;
 
@@ -111,6 +114,15 @@ public class SignalEventProjectionService(SignalsDbContext db) : ISignalEventPro
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Broadcast to real-time clients
+        await broadcaster.BroadcastTriggerEventAsync(trigger);
+        foreach (var reading in readings)
+        {
+            await broadcaster.BroadcastSensorReadingAsync(reading);
+        }
+
+        return new ProjectedEventData(trigger, readings);
     }
 
     private static bool? TryGetBool(JsonElement payload, string name)

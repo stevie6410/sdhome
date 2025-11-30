@@ -1,73 +1,72 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
-import { ButtonModule } from 'primeng/button';
-import { DrawerModule } from 'primeng/drawer';
-import { MenuModule } from 'primeng/menu';
-import { ToolbarModule } from 'primeng/toolbar';
-import { MenuItem } from 'primeng/api';
-import { ThemeService } from '../core/services/theme.service';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
+import { SignalRService } from '../core/services/signalr.service';
+
+interface NavItem {
+  label: string;
+  icon: string;
+  route: string;
+  badge?: () => number;
+}
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterModule,
-    ButtonModule,
-    DrawerModule,
-    MenuModule,
-    ToolbarModule
-  ],
+  imports: [CommonModule, RouterModule],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss'
 })
-export class LayoutComponent {
-  themeService = inject(ThemeService);
-  drawerVisible = false;
+export class LayoutComponent implements OnInit {
+  signalR = inject(SignalRService);
+  router = inject(Router);
 
-  menuItems: MenuItem[] = [
-    {
-      label: 'Dashboard',
-      icon: 'pi pi-home',
-      routerLink: '/dashboard'
-    },
-    {
-      label: 'Signals',
-      icon: 'pi pi-bolt',
-      routerLink: '/signals'
-    },
-    {
-      label: 'Readings',
-      icon: 'pi pi-chart-line',
-      routerLink: '/readings'
-    },
-    {
-      label: 'Triggers',
-      icon: 'pi pi-bell',
-      routerLink: '/triggers'
-    },
-    {
-      label: 'Devices',
-      icon: 'pi pi-box',
-      routerLink: '/devices'
-    },
-    {
-      separator: true
-    },
-    {
-      label: 'Settings',
-      icon: 'pi pi-cog',
-      routerLink: '/settings'
-    }
+  drawerVisible = false;
+  currentRoute = signal('');
+
+  navItems: NavItem[] = [
+    { label: 'Dashboard', icon: '🏠', route: '/dashboard' },
+    { label: 'Live Monitor', icon: '⚡', route: '/signals', badge: () => this.signalR.signalCount() },
+    { label: 'Readings', icon: '📊', route: '/readings' },
+    { label: 'Triggers', icon: '🔔', route: '/triggers' },
+    { label: 'Devices', icon: '📡', route: '/devices' },
+    { label: 'Zones', icon: '🏢', route: '/zones' },
   ];
 
-  // Computed property for theme icon
-  themeIcon = computed(() =>
-    this.themeService.theme() === 'dark' ? 'pi pi-sun' : 'pi pi-moon'
-  );
+  // Computed connection status
+  connectionStatus = computed(() => {
+    switch (this.signalR.connectionState()) {
+      case 'connected': return { text: 'Live', class: 'status-live' };
+      case 'connecting': return { text: 'Connecting...', class: 'status-connecting' };
+      case 'reconnecting': return { text: 'Reconnecting...', class: 'status-reconnecting' };
+      default: return { text: 'Offline', class: 'status-offline' };
+    }
+  });
+
+  ngOnInit(): void {
+    // Connect to SignalR
+    this.signalR.connect();
+
+    // Track current route for active state
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe((event: any) => {
+      this.currentRoute.set(event.urlAfterRedirects);
+    });
+
+    this.currentRoute.set(this.router.url);
+  }
+
+  isActive(route: string): boolean {
+    return this.currentRoute().startsWith(route);
+  }
 
   toggleDrawer(): void {
     this.drawerVisible = !this.drawerVisible;
+  }
+
+  closeDrawer(): void {
+    this.drawerVisible = false;
   }
 }

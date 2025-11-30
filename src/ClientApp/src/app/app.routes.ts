@@ -30,6 +30,14 @@ export const routes: Routes = [
       {
         path: 'devices',
         loadComponent: () => import('./features/devices/devices.component').then(m => m.DevicesComponent)
+      },
+      {
+        path: 'zones',
+        loadComponent: () => import('./features/zones/zones.component').then(m => m.ZonesComponent)
+      },
+      {
+        path: 'zones/manage',
+        loadComponent: () => import('./features/zones/zone-manager/zone-manager.component').then(m => m.ZoneManagerComponent)
       }
     ]
   }

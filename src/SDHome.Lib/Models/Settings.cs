@@ -6,6 +6,10 @@
         public string Host { get; set; } = "";
         public int Port { get; set; }
         public string TopicFilter { get; set; } = "sdhome/#";
+        /// <summary>
+        /// Base topic for Zigbee2MQTT (without trailing slash). Default is "sdhome".
+        /// </summary>
+        public string BaseTopic { get; set; } = "sdhome";
     }
 
     public class MsSQLOptions

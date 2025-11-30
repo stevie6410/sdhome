@@ -1,331 +1,85 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { CardModule } from 'primeng/card';
-import { TableModule } from 'primeng/table';
-import { ButtonModule } from 'primeng/button';
-import { TagModule } from 'primeng/tag';
-import { DialogModule } from 'primeng/dialog';
-import { InputTextModule } from 'primeng/inputtext';
-import { SelectModule } from 'primeng/select';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { DevicesApiService, Device, DeviceType } from '../../api/sdhome-client';
+import { SignalRService, DeviceSyncProgress, DevicePairingDevice } from '../../core/services/signalr.service';
+import { PairingDialogComponent } from './pairing-dialog/pairing-dialog.component';
 
 @Component({
   selector: 'app-devices',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterModule,
-    CardModule,
-    TableModule,
-    ButtonModule,
-    TagModule,
-    DialogModule,
-    InputTextModule,
-    SelectModule,
-    FormsModule
-  ],
-  template: `
-    <div class="page-container">
-      <div class="page-header">
-        <h1>Devices</h1>
-        <p-button
-          label="Sync from Zigbee2MQTT"
-          icon="pi pi-refresh"
-          (onClick)="syncDevices()"
-          [loading]="syncing()"
-          severity="secondary" />
-      </div>
-
-      <p-card>
-        <p-table
-          [value]="devices()"
-          [loading]="loading()"
-          [paginator]="true"
-          [rows]="10"
-          [rowsPerPageOptions]="[10, 25, 50]"
-          [globalFilterFields]="['friendlyName', 'manufacturer', 'room', 'deviceType']"
-          styleClass="p-datatable-sm">
-
-          <ng-template pTemplate="caption">
-            <div class="table-header">
-              <span class="p-input-icon-left">
-                <i class="pi pi-search"></i>
-                <input
-                  pInputText
-                  type="text"
-                  (input)="onSearch($event)"
-                  placeholder="Search devices..." />
-              </span>
-            </div>
-          </ng-template>
-
-          <ng-template pTemplate="header">
-            <tr>
-              <th pSortableColumn="friendlyName">
-                Name <p-sortIcon field="friendlyName" />
-              </th>
-              <th pSortableColumn="manufacturer">Manufacturer</th>
-              <th pSortableColumn="modelId">Model</th>
-              <th pSortableColumn="deviceType">
-                Type <p-sortIcon field="deviceType" />
-              </th>
-              <th pSortableColumn="room">
-                Room <p-sortIcon field="room" />
-              </th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </ng-template>
-
-          <ng-template pTemplate="body" let-device>
-            <tr>
-              <td>
-                <div class="device-name">
-                  <i class="pi" [ngClass]="getDeviceIcon(device.deviceType)"></i>
-                  <span>{{ device.friendlyName }}</span>
-                </div>
-              </td>
-              <td>{{ device.manufacturer || '-' }}</td>
-              <td>{{ device.modelId || '-' }}</td>
-              <td>
-                <p-tag
-                  [value]="device.deviceType || 'Other'"
-                  [severity]="getDeviceTypeSeverity(device.deviceType)" />
-              </td>
-              <td>{{ device.room || 'Unassigned' }}</td>
-              <td>
-                <p-tag
-                  [value]="device.isAvailable ? 'Online' : 'Offline'"
-                  [severity]="device.isAvailable ? 'success' : 'danger'" />
-              </td>
-              <td>
-                <p-button
-                  icon="pi pi-pencil"
-                  [text]="true"
-                  [rounded]="true"
-                  severity="secondary"
-                  (onClick)="editDevice(device)" />
-              </td>
-            </tr>
-          </ng-template>
-
-          <ng-template pTemplate="emptymessage">
-            <tr>
-              <td colspan="7" class="text-center">
-                <div class="empty-state">
-                  <i class="pi pi-inbox" style="font-size: 3rem; color: var(--text-color-secondary);"></i>
-                  <p>No devices found</p>
-                  <p-button
-                    label="Sync Devices"
-                    icon="pi pi-refresh"
-                    (onClick)="syncDevices()"
-                    [outlined]="true" />
-                </div>
-              </td>
-            </tr>
-          </ng-template>
-        </p-table>
-      </p-card>
-
-      <!-- Edit Device Dialog -->
-      <p-dialog
-        [(visible)]="showEditDialog"
-        [modal]="true"
-        [style]="{ width: '500px' }"
-        header="Edit Device">
-
-        <div class="dialog-content" *ngIf="selectedDevice">
-          <div class="form-field">
-            <label for="friendlyName">Friendly Name</label>
-            <input
-              id="friendlyName"
-              type="text"
-              pInputText
-              [(ngModel)]="selectedDevice.friendlyName"
-              class="w-full" />
-          </div>
-
-          <div class="form-field">
-            <label for="deviceType">Device Type</label>
-            <p-select
-              id="deviceType"
-              [(ngModel)]="selectedDevice.deviceType"
-              [options]="deviceTypes"
-              optionLabel="label"
-              optionValue="value"
-              placeholder="Select device type"
-              class="w-full" />
-          </div>
-
-          <div class="form-field">
-            <label for="room">Room</label>
-            <input
-              id="room"
-              type="text"
-              pInputText
-              [(ngModel)]="selectedDevice.room"
-              placeholder="e.g., Living Room, Bedroom"
-              class="w-full" />
-          </div>
-
-          <div class="device-info">
-            <h4>Device Information</h4>
-            <div class="info-row">
-              <span class="label">Manufacturer:</span>
-              <span>{{ selectedDevice.manufacturer || '-' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">Model:</span>
-              <span>{{ selectedDevice.modelId || '-' }}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">IEEE Address:</span>
-              <span class="monospace">{{ selectedDevice.ieeeAddress || '-' }}</span>
-            </div>
-            <div class="info-row" *ngIf="selectedDevice.capabilities && selectedDevice.capabilities.length > 0">
-              <span class="label">Capabilities:</span>
-              <span>
-                <p-tag
-                  *ngFor="let cap of selectedDevice.capabilities"
-                  [value]="cap"
-                  severity="info"
-                  [style]="{ 'margin-right': '0.5rem' }" />
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <ng-template pTemplate="footer">
-          <p-button
-            label="Cancel"
-            [outlined]="true"
-            (onClick)="showEditDialog = false" />
-          <p-button
-            label="Save"
-            (onClick)="saveDevice()"
-            [loading]="saving()" />
-        </ng-template>
-      </p-dialog>
-    </div>
-  `,
-  styles: [`
-    .page-container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-    }
-
-    .page-header h1 {
-      font-size: 2.5rem;
-      font-weight: 700;
-      margin: 0;
-      color: var(--text-color);
-    }
-
-    .table-header {
-      display: flex;
-      justify-content: flex-end;
-      padding: 1rem 0;
-    }
-
-    .device-name {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-weight: 600;
-    }
-
-    .device-name i {
-      font-size: 1.25rem;
-      color: var(--primary-color);
-    }
-
-    .empty-state {
-      padding: 3rem;
-      text-align: center;
-    }
-
-    .empty-state p {
-      margin: 1rem 0;
-      color: var(--text-color-secondary);
-    }
-
-    .dialog-content {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-      padding: 1rem 0;
-    }
-
-    .form-field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .form-field label {
-      font-weight: 600;
-      color: var(--text-color);
-    }
-
-    .w-full {
-      width: 100%;
-    }
-
-    .device-info {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: var(--surface-ground);
-      border-radius: 8px;
-    }
-
-    .device-info h4 {
-      margin: 0 0 1rem 0;
-      color: var(--text-color);
-    }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--surface-border);
-    }
-
-    .info-row:last-child {
-      border-bottom: none;
-    }
-
-    .info-row .label {
-      font-weight: 600;
-      color: var(--text-color-secondary);
-    }
-
-    .monospace {
-      font-family: 'Courier New', monospace;
-      font-size: 0.875rem;
-    }
-
-    .text-center {
-      text-align: center;
-    }
-  `]
+  imports: [CommonModule, RouterModule, FormsModule, PairingDialogComponent],
+  templateUrl: './devices.component.html',
+  styleUrl: './devices.component.scss'
 })
-export class DevicesComponent implements OnInit {
+export class DevicesComponent implements OnInit, OnDestroy {
+  private apiService = inject(DevicesApiService);
+  private signalRService = inject(SignalRService);
+  private http = inject(HttpClient);
+
   devices = signal<Device[]>([]);
   loading = signal(false);
   syncing = signal(false);
   saving = signal(false);
+  renaming = signal(false);
   showEditDialog = false;
   selectedDevice: Device | null = null;
+  originalDeviceName: string | null = null;
+  newDeviceName: string = '';
+  searchFilter = signal('');
+  showTypeDropdown = false;
+  typeFilter = signal<DeviceType | null>(null);
+
+  // Sync modal state
+  showSyncModal = signal(false);
+  syncProgress = this.signalRService.deviceSyncProgress;
+
+  // Pairing dialog state
+  showPairingDialog = signal(false);
+
+  // Computed sync status helpers
+  syncStatusIcon = computed(() => {
+    const progress = this.syncProgress();
+    if (!progress) return '🔄';
+    switch (progress.status) {
+      case 'Started': return '🚀';
+      case 'Connecting': return '🔌';
+      case 'Subscribing': return '📡';
+      case 'WaitingForDevices': return '⏳';
+      case 'DeviceReceived': return '📥';
+      case 'Processing': return '⚙️';
+      case 'DeviceProcessed': return '✨';
+      case 'Completed': return '✅';
+      case 'Failed': return '❌';
+      default: return '🔄';
+    }
+  });
+
+  syncProgressPercent = computed(() => {
+    const progress = this.syncProgress();
+    if (!progress || progress.devicesTotal === 0) return 0;
+    return Math.round((progress.devicesProcessed / progress.devicesTotal) * 100);
+  });
+
+  newDevicesCount = computed(() => {
+    const progress = this.syncProgress();
+    if (!progress?.discoveredDevices) return 0;
+    return progress.discoveredDevices.filter(d => d.isNew && !d.isRemoved).length;
+  });
+
+  updatedDevicesCount = computed(() => {
+    const progress = this.syncProgress();
+    if (!progress?.discoveredDevices) return 0;
+    return progress.discoveredDevices.filter(d => !d.isNew && !d.isRemoved).length;
+  });
+
+  removedDevicesCount = computed(() => {
+    const progress = this.syncProgress();
+    if (!progress?.discoveredDevices) return 0;
+    return progress.discoveredDevices.filter(d => d.isRemoved).length;
+  });
 
   deviceTypes = [
     { label: 'Light', value: DeviceType.Light },
@@ -338,11 +92,71 @@ export class DevicesComponent implements OnInit {
     { label: 'Other', value: DeviceType.Other }
   ];
 
-  constructor(private apiService: DevicesApiService) {
+  // Filtered devices
+  filteredDevices = computed(() => {
+    const search = this.searchFilter().toLowerCase();
+    const type = this.typeFilter();
+    let result = this.devices();
+
+    if (search) {
+      result = result.filter(d =>
+        d.friendlyName?.toLowerCase().includes(search) ||
+        d.manufacturer?.toLowerCase().includes(search) ||
+        d.room?.toLowerCase().includes(search) ||
+        (d.deviceType?.toString() || '').toLowerCase().includes(search)
+      );
+    }
+
+    if (type !== null) {
+      result = result.filter(d => d.deviceType === type);
+    }
+
+    return result;
+  });
+
+  // Stats
+  stats = computed(() => {
+    const devices = this.devices();
+    const online = devices.filter(d => d.isAvailable).length;
+    const byType: Record<string, number> = {};
+    const byRoom: Record<string, number> = {};
+
+    devices.forEach(d => {
+      if (d.deviceType !== undefined) {
+        const typeStr = DeviceType[d.deviceType] || 'Unknown';
+        byType[typeStr] = (byType[typeStr] || 0) + 1;
+      }
+      const room = d.room || 'Unassigned';
+      byRoom[room] = (byRoom[room] || 0) + 1;
+    });
+
+    return {
+      total: devices.length,
+      online,
+      offline: devices.length - online,
+      byType,
+      byRoom
+    };
+  });
+
+  constructor() {
+    // Auto-close sync modal when sync completes successfully
+    effect(() => {
+      const progress = this.syncProgress();
+      if (progress?.status === 'Completed') {
+        // Reload devices after successful sync
+        this.loadDevices();
+      }
+    });
   }
 
   ngOnInit() {
     this.loadDevices();
+  }
+
+  ngOnDestroy() {
+    // Clean up sync progress when leaving the page
+    this.signalRService.clearSyncProgress();
   }
 
   async loadDevices() {
@@ -358,20 +172,51 @@ export class DevicesComponent implements OnInit {
   }
 
   async syncDevices() {
+    // Clear any previous sync progress
+    this.signalRService.clearSyncProgress();
+    this.showSyncModal.set(true);
     this.syncing.set(true);
+
     try {
-      await this.apiService.syncDevices().toPromise();
-      await this.loadDevices();
+      // Call the realtime sync endpoint
+      this.http.post<any>('/api/devices/sync/realtime', {}).subscribe({
+        next: (response) => {
+          console.log('Sync completed:', response);
+          this.syncing.set(false);
+        },
+        error: (err) => {
+          console.error('Sync error:', err);
+          this.syncing.set(false);
+        }
+      });
     } catch (error) {
       console.error('Error syncing devices:', error);
-    } finally {
       this.syncing.set(false);
     }
   }
 
+  closeSyncModal() {
+    this.showSyncModal.set(false);
+    // Don't clear progress immediately so user can see final state
+    setTimeout(() => {
+      if (!this.showSyncModal()) {
+        this.signalRService.clearSyncProgress();
+      }
+    }, 500);
+  }
+
   editDevice(device: Device) {
     this.selectedDevice = Device.fromJS(JSON.parse(JSON.stringify(device)));
+    this.originalDeviceName = device.friendlyName || device.deviceId || null;
+    this.newDeviceName = '';
     this.showEditDialog = true;
+  }
+
+  closeDialog() {
+    this.showEditDialog = false;
+    this.selectedDevice = null;
+    this.originalDeviceName = null;
+    this.newDeviceName = '';
   }
 
   async saveDevice() {
@@ -379,8 +224,12 @@ export class DevicesComponent implements OnInit {
 
     this.saving.set(true);
     try {
+      // Just update local attributes (display name, room, type, etc.)
       await this.apiService.updateDevice(this.selectedDevice.deviceId!, this.selectedDevice).toPromise();
+
       this.showEditDialog = false;
+      this.originalDeviceName = null;
+      this.newDeviceName = '';
       await this.loadDevices();
     } catch (error) {
       console.error('Error saving device:', error);
@@ -389,31 +238,90 @@ export class DevicesComponent implements OnInit {
     }
   }
 
-  onSearch(event: Event) {
-    const input = event.target as HTMLInputElement;
-    // Table filtering will be handled by PrimeNG's globalFilter
+  async renameDevice() {
+    if (!this.selectedDevice || !this.newDeviceName || this.newDeviceName === this.selectedDevice.deviceId) {
+      return;
+    }
+
+    this.renaming.set(true);
+    try {
+      await this.http.post<Device>(
+        `/api/devices/${encodeURIComponent(this.selectedDevice.deviceId!)}/rename`,
+        { newName: this.newDeviceName }
+      ).toPromise();
+
+      console.log(`Device renamed from '${this.selectedDevice.deviceId}' to '${this.newDeviceName}'`);
+
+      // Update the selected device with new name
+      this.selectedDevice.deviceId = this.newDeviceName;
+      this.selectedDevice.friendlyName = this.newDeviceName;
+      this.originalDeviceName = this.newDeviceName;
+      this.newDeviceName = '';
+
+      await this.loadDevices();
+    } catch (error) {
+      console.error('Error renaming device:', error);
+    } finally {
+      this.renaming.set(false);
+    }
+  }
+
+  selectType(type: DeviceType | null) {
+    this.typeFilter.set(type);
+    this.showTypeDropdown = false;
+  }
+
+  getSelectedTypeLabel(): string {
+    const type = this.typeFilter();
+    if (type === null) return 'All Types';
+    return DeviceType[type] || 'Unknown';
   }
 
   getDeviceIcon(type?: DeviceType): string {
     switch (type) {
-      case DeviceType.Light: return 'pi-sun';
-      case DeviceType.Switch: return 'pi-power-off';
-      case DeviceType.Sensor: return 'pi-chart-line';
-      case DeviceType.Climate: return 'pi-home';
-      case DeviceType.Lock: return 'pi-lock';
-      case DeviceType.Cover: return 'pi-window-maximize';
-      case DeviceType.Fan: return 'pi-spin';
-      default: return 'pi-box';
+      case DeviceType.Light: return '💡';
+      case DeviceType.Switch: return '🔌';
+      case DeviceType.Sensor: return '📡';
+      case DeviceType.Climate: return '🌡️';
+      case DeviceType.Lock: return '🔒';
+      case DeviceType.Cover: return '🪟';
+      case DeviceType.Fan: return '🌀';
+      default: return '📦';
     }
   }
 
-  getDeviceTypeSeverity(type?: DeviceType): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' | undefined {
+  getDeviceTypeName(type?: DeviceType): string {
+    if (type === undefined) return 'Unknown';
+    return DeviceType[type] || 'Unknown';
+  }
+
+  getDeviceTypeClass(type?: DeviceType): string {
     switch (type) {
-      case DeviceType.Light: return 'warn';
+      case DeviceType.Light: return 'warning';
       case DeviceType.Switch: return 'info';
       case DeviceType.Sensor: return 'success';
-      case DeviceType.Climate: return 'info';
+      case DeviceType.Climate: return 'cyan';
+      case DeviceType.Lock: return 'danger';
+      case DeviceType.Cover: return 'magenta';
       default: return 'secondary';
     }
+  }
+
+  openPairingDialog() {
+    this.showPairingDialog.set(true);
+  }
+
+  closePairingDialog() {
+    this.showPairingDialog.set(false);
+  }
+
+  onDevicePaired(device: DevicePairingDevice) {
+    console.log('Device paired:', device);
+    // Reload devices after a device is paired
+    setTimeout(() => this.loadDevices(), 1000);
+  }
+
+  trackDevice(index: number, device: Device): string {
+    return device.deviceId ?? index.toString();
   }
 }

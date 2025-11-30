@@ -1,0 +1,389 @@
+<div class="devices-page">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>📡 Devices</h1>
+        <p class="subtitle">Manage your Zigbee2MQTT devices</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">📡</div>
+      <div class="stat-content">
+        <span class="stat-value">{{ stats().total }}</span>
+        <span class="stat-label">Total Devices</span>
+      </div>
+    </div>
+    <div class="stat-card online">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <span class="stat-value">{{ stats().online }}</span>
+        <span class="stat-label">Online</span>
+      </div>
+    </div>
+    <div class="stat-card offline">
+      <div class="stat-icon">⚠️</div>
+      <div class="stat-content">
+        <span class="stat-value">{{ stats().offline }}</span>
+        <span class="stat-label">Offline</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control Bar -->
+  <div class="control-bar">
+    <div class="filters">
+      <!-- Search -->
+      <div class="search-input">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          placeholder="Search devices..."
+          [ngModel]="searchFilter()"
+          (ngModelChange)="searchFilter.set($event)"
+        />
+        @if (searchFilter()) {
+          <button class="clear-search" (click)="searchFilter.set('')">✕</button>
+        }
+      </div>
+
+      <!-- Type Filter Dropdown -->
+      <div class="dropdown-wrapper">
+        <button class="dropdown-trigger" (click)="showTypeDropdown = !showTypeDropdown">
+          <span>{{ getSelectedTypeLabel() }}</span>
+          <span class="dropdown-arrow">▼</span>
+        </button>
+        @if (showTypeDropdown) {
+          <div class="dropdown-menu">
+            <button
+              class="dropdown-item"
+              [class.active]="typeFilter() === null"
+              (click)="selectType(null)"
+            >
+              All Types
+            </button>
+            @for (type of deviceTypes; track type.value) {
+              <button
+                class="dropdown-item"
+                [class.active]="typeFilter() === type.value"
+                (click)="selectType(type.value)"
+              >
+                {{ type.label }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-accent" (click)="openPairingDialog()">
+        📡 Pair Device
+      </button>
+      <button class="btn btn-secondary" (click)="syncDevices()" [disabled]="syncing()">
+        @if (syncing()) {
+          <span class="spinner-sm"></span>
+        } @else {
+          🔗
+        }
+        Sync with Zigbee
+      </button>
+      <button class="btn btn-primary" (click)="loadDevices()" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner-sm"></span>
+        } @else {
+          🔄
+        }
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Devices Grid -->
+  <div class="devices-grid">
+    @if (loading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <span>Loading devices...</span>
+      </div>
+    } @else if (filteredDevices().length === 0) {
+      <div class="empty-state">
+        <span class="empty-icon">📭</span>
+        <span class="empty-text">No devices found</span>
+        <span class="empty-hint">Click "Sync with Zigbee" to discover devices from your Zigbee2MQTT bridge</span>
+      </div>
+    } @else {
+      @for (device of filteredDevices(); track trackDevice($index, device)) {
+        <div class="device-card" [class.offline]="!device.isAvailable">
+          <div class="device-header">
+            <div class="device-icon">{{ getDeviceIcon(device.deviceType) }}</div>
+            <div class="device-status" [class.online]="device.isAvailable" [class.offline]="!device.isAvailable">
+              {{ device.isAvailable ? 'Online' : 'Offline' }}
+            </div>
+          </div>
+
+          <div class="device-body">
+            <h3 class="device-name">{{ device.friendlyName || 'Unknown Device' }}</h3>
+
+            <div class="device-meta">
+              @if (device.manufacturer) {
+                <span class="meta-item">🏭 {{ device.manufacturer }}</span>
+              }
+              @if (device.room) {
+                <span class="meta-item">📍 {{ device.room }}</span>
+              }
+              @if (device.deviceType !== undefined) {
+                <span class="tag" [ngClass]="'tag-' + getDeviceTypeClass(device.deviceType)">
+                  {{ getDeviceTypeName(device.deviceType) }}
+                </span>
+              }
+            </div>
+          </div>
+
+          <div class="device-footer">
+            <button class="btn btn-text" (click)="editDevice(device)">
+              ✏️ Edit
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</div>
+
+<!-- Edit Dialog -->
+@if (showEditDialog && selectedDevice) {
+  <div class="dialog-overlay" (click)="closeDialog()">
+    <div class="dialog edit-device-dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>Edit Device</h2>
+        <button class="dialog-close" (click)="closeDialog()">✕</button>
+      </div>
+
+      <div class="dialog-body">
+        <!-- Device Name (MQTT Topic) - Read Only -->
+        <div class="form-group">
+          <label>Device Name <span class="label-hint">(MQTT identifier)</span></label>
+          <div class="device-name-display">
+            <code class="device-id">{{ selectedDevice.deviceId }}</code>
+          </div>
+          <div class="topic-preview">
+            <span class="topic-label">📡 Topic:</span>
+            <code class="topic-path">sdhome/{{ selectedDevice.deviceId }}</code>
+          </div>
+        </div>
+
+        <!-- Display Name - Editable -->
+        <div class="form-group">
+          <label>Display Name <span class="label-hint">(shown in UI)</span></label>
+          <input
+            type="text"
+            [(ngModel)]="selectedDevice.displayName"
+            [placeholder]="selectedDevice.friendlyName || 'Enter a friendly display name'"
+          />
+          <div class="field-hint">
+            Leave empty to use device name: <strong>{{ selectedDevice.friendlyName }}</strong>
+          </div>
+        </div>
+
+        <!-- Rename Device (MQTT) -->
+        <div class="form-group rename-section">
+          <label>Rename Device <span class="label-hint">(changes MQTT topic)</span></label>
+          <div class="rename-warning">
+            ⚠️ Renaming changes the MQTT topic and may break automations.
+          </div>
+          <div class="rename-input-group">
+            <input
+              type="text"
+              [(ngModel)]="newDeviceName"
+              [placeholder]="selectedDevice.deviceId"
+              class="rename-input"
+            />
+            <button
+              class="btn btn-warning btn-sm"
+              (click)="renameDevice()"
+              [disabled]="!newDeviceName || newDeviceName === selectedDevice.deviceId || renaming()">
+              @if (renaming()) {
+                <span class="spinner-sm"></span>
+              }
+              Rename
+            </button>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="form-group">
+          <label>Room</label>
+          <input type="text" [(ngModel)]="selectedDevice.room" />
+        </div>
+
+        <div class="form-group">
+          <label>Device Type</label>
+          <select [(ngModel)]="selectedDevice.deviceType">
+            @for (type of deviceTypes; track type.value) {
+              <option [ngValue]="type.value">{{ type.label }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Device Info -->
+        <div class="device-info-section">
+          <h4>Device Information</h4>
+          <div class="info-grid">
+            @if (selectedDevice.manufacturer) {
+              <div class="info-item">
+                <span class="info-label">Manufacturer</span>
+                <span class="info-value">{{ selectedDevice.manufacturer }}</span>
+              </div>
+            }
+            @if (selectedDevice.modelId) {
+              <div class="info-item">
+                <span class="info-label">Model</span>
+                <span class="info-value">{{ selectedDevice.modelId }}</span>
+              </div>
+            }
+            @if (selectedDevice.ieeeAddress) {
+              <div class="info-item">
+                <span class="info-label">IEEE Address</span>
+                <code class="info-value">{{ selectedDevice.ieeeAddress }}</code>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" (click)="closeDialog()">Cancel</button>
+        <button class="btn btn-primary" (click)="saveDevice()" [disabled]="saving()">
+          @if (saving()) {
+            <span class="spinner-sm"></span>
+          }
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Sync Modal -->
+@if (showSyncModal()) {
+  <div class="dialog-overlay sync-overlay" (click)="syncProgress()?.status === 'Completed' || syncProgress()?.status === 'Failed' ? closeSyncModal() : null">
+    <div class="sync-modal" (click)="$event.stopPropagation()">
+      <div class="sync-header">
+        <div class="sync-title">
+          <span class="sync-icon" [class.pulse]="syncing()">{{ syncStatusIcon() }}</span>
+          <h2>Device Sync</h2>
+        </div>
+        @if (syncProgress()?.status === 'Completed' || syncProgress()?.status === 'Failed') {
+          <button class="dialog-close" (click)="closeSyncModal()">✕</button>
+        }
+      </div>
+
+      <div class="sync-body">
+        <!-- Status Message -->
+        <div class="sync-status" [class.error]="syncProgress()?.status === 'Failed'" [class.success]="syncProgress()?.status === 'Completed'">
+          <span class="status-message">{{ syncProgress()?.message || 'Initializing...' }}</span>
+          @if (syncProgress()?.error) {
+            <span class="status-error">{{ syncProgress()?.error }}</span>
+          }
+        </div>
+
+        <!-- Progress Bar -->
+        @if ((syncProgress()?.devicesTotal ?? 0) > 0) {
+          <div class="sync-progress-bar">
+            <div class="progress-track">
+              <div class="progress-fill" [style.width.%]="syncProgressPercent()"></div>
+            </div>
+            <div class="progress-stats">
+              <span>{{ syncProgress()?.devicesProcessed || 0 }} / {{ syncProgress()?.devicesTotal || 0 }}</span>
+              <span>{{ syncProgressPercent() }}%</span>
+            </div>
+          </div>
+        }
+
+        <!-- Discovered Devices List -->
+        @if ((syncProgress()?.discoveredDevices?.length ?? 0) > 0) {
+          <div class="discovered-devices">
+            <h3>Discovered Devices</h3>
+            <div class="device-list">
+              @for (device of syncProgress()?.discoveredDevices; track device.deviceId) {
+                <div class="discovered-device" [class.new]="device.isNew" [class.removed]="device.isRemoved" [class.current]="syncProgress()?.currentDevice?.deviceId === device.deviceId">
+                  <div class="device-indicator">
+                    @if (device.isRemoved) {
+                      <span class="removed-badge">DEL</span>
+                    } @else if (device.isNew) {
+                      <span class="new-badge">NEW</span>
+                    } @else {
+                      <span class="update-badge">UPD</span>
+                    }
+                  </div>
+                  <div class="device-info">
+                    <span class="device-name">{{ device.friendlyName }}</span>
+                    <span class="device-meta">
+                      @if (device.manufacturer) {
+                        {{ device.manufacturer }}
+                      }
+                      @if (device.deviceType) {
+                        · {{ device.deviceType }}
+                      }
+                    </span>
+                  </div>
+                  @if (syncProgress()?.currentDevice?.deviceId === device.deviceId) {
+                    <span class="processing-indicator">⚡</span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Loading Animation when waiting -->
+        @if (syncProgress()?.status === 'WaitingForDevices' || syncProgress()?.status === 'Connecting' || syncProgress()?.status === 'Subscribing') {
+          <div class="waiting-animation">
+            <div class="wave-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="sync-footer">
+        @if (syncProgress()?.status === 'Completed') {
+          <div class="sync-summary">
+            <span class="summary-stat new">
+              <strong>{{ newDevicesCount() }}</strong> new
+            </span>
+            <span class="summary-stat updated">
+              <strong>{{ updatedDevicesCount() }}</strong> updated
+            </span>
+            @if (removedDevicesCount() > 0) {
+              <span class="summary-stat removed">
+                <strong>{{ removedDevicesCount() }}</strong> removed
+              </span>
+            }
+          </div>
+          <button class="btn btn-primary" (click)="closeSyncModal()">Done</button>
+        } @else if (syncProgress()?.status === 'Failed') {
+          <button class="btn btn-secondary" (click)="closeSyncModal()">Close</button>
+          <button class="btn btn-primary" (click)="syncDevices()">Retry</button>
+        } @else {
+          <span class="sync-hint">Syncing with Zigbee2MQTT...</span>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Pairing Dialog -->
+<app-pairing-dialog
+  [isOpen]="showPairingDialog()"
+  (closed)="closePairingDialog()"
+  (devicePaired)="onDevicePaired($event)">
+</app-pairing-dialog>

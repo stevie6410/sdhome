@@ -1,64 +1,85 @@
 <div class="layout-container">
   <!-- Side Navigation -->
-  <aside class="layout-sidebar">
-    <div class="sidebar-header">
-      <i class="pi pi-bolt logo-icon"></i>
-      <span class="app-title">SDHome</span>
+  <aside class="sidebar">
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <div class="logo-icon">⚡</div>
+      <span class="logo-text">SDHome</span>
     </div>
 
+    <!-- Navigation Items -->
     <nav class="sidebar-nav">
-      <p-menu [model]="menuItems" styleClass="sidebar-menu" />
+      @for (item of navItems; track item.route) {
+        <a
+          [routerLink]="item.route"
+          class="nav-item"
+          [class.active]="isActive(item.route)"
+          [attr.title]="item.label"
+        >
+          <div class="nav-icon">{{ item.icon }}</div>
+          <span class="nav-label">{{ item.label }}</span>
+          @if (item.badge && item.badge() > 0) {
+            <span class="nav-badge">{{ item.badge() }}</span>
+          }
+          <div class="nav-glow"></div>
+        </a>
+      }
     </nav>
 
+    <!-- Connection Status -->
     <div class="sidebar-footer">
-      <p-button
-        [icon]="themeIcon()"
-        [text]="true"
-        [rounded]="true"
-        (onClick)="themeService.toggleTheme()"
-        [aria-label]="'Switch to ' + (themeService.theme() === 'light' ? 'dark' : 'light') + ' mode'"
-        styleClass="theme-toggle"
-      />
+      <div class="connection-status" [ngClass]="connectionStatus().class">
+        <span class="status-dot"></span>
+        <span class="status-text">{{ connectionStatus().text }}</span>
+      </div>
     </div>
   </aside>
 
-  <!-- Mobile Drawer -->
-  <p-drawer [(visible)]="drawerVisible" [modal]="true" position="left">
-    <ng-template pTemplate="header">
+  <!-- Mobile Header -->
+  <header class="mobile-header">
+    <button class="menu-toggle" (click)="toggleDrawer()">☰</button>
+    <div class="mobile-logo">
+      <span class="logo-icon">⚡</span>
+      <span>SDHome</span>
+    </div>
+    <div class="connection-indicator" [ngClass]="connectionStatus().class">
+      <span class="status-dot"></span>
+    </div>
+  </header>
+
+  <!-- Mobile Drawer Overlay -->
+  @if (drawerVisible) {
+    <div class="drawer-overlay" (click)="closeDrawer()"></div>
+    <div class="mobile-drawer">
       <div class="drawer-header">
-        <i class="pi pi-bolt logo-icon"></i>
-        <span class="app-title">SDHome</span>
+        <div class="drawer-logo">
+          <span class="logo-icon">⚡</span>
+          <span>SDHome</span>
+        </div>
+        <button class="drawer-close" (click)="closeDrawer()">✕</button>
       </div>
-    </ng-template>
 
-    <p-menu [model]="menuItems" styleClass="w-full border-none" />
-  </p-drawer>
+      <nav class="drawer-nav">
+        @for (item of navItems; track item.route) {
+          <a
+            [routerLink]="item.route"
+            class="drawer-item"
+            [class.active]="isActive(item.route)"
+            (click)="closeDrawer()"
+          >
+            <span class="drawer-icon">{{ item.icon }}</span>
+            <span>{{ item.label }}</span>
+            @if (item.badge && item.badge() > 0) {
+              <span class="drawer-badge">{{ item.badge() }}</span>
+            }
+          </a>
+        }
+      </nav>
+    </div>
+  }
 
-  <!-- Main Content Area -->
-  <div class="layout-main">
-    <!-- Top Bar (Mobile) -->
-    <header class="layout-topbar">
-      <p-button
-        icon="pi pi-bars"
-        [text]="true"
-        [rounded]="true"
-        (onClick)="toggleDrawer()"
-        aria-label="Toggle menu"
-        styleClass="menu-toggle"
-      />
-      <span class="topbar-title">SDHome</span>
-      <p-button
-        [icon]="themeIcon()"
-        [text]="true"
-        [rounded]="true"
-        (onClick)="themeService.toggleTheme()"
-        [aria-label]="'Switch to ' + (themeService.theme() === 'light' ? 'dark' : 'light') + ' mode'"
-      />
-    </header>
-
-    <!-- Page Content -->
-    <main class="layout-content">
-      <router-outlet />
-    </main>
-  </div>
+  <!-- Main Content -->
+  <main class="main-content">
+    <router-outlet />
+  </main>
 </div>

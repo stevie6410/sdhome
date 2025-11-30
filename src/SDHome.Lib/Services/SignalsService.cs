@@ -15,7 +15,8 @@ public class SignalsService(
     SignalsDbContext db,
     HttpClient httpClient,
     IOptions<WebhookOptions> webhookOptions,
-    ISignalEventProjectionService projectionService) : ISignalsService
+    ISignalEventProjectionService projectionService,
+    IRealtimeEventBroadcaster realtimeBroadcaster) : ISignalsService
 {
     private static readonly Counter ReceivedEventsTotal =
         Metrics.CreateCounter("signals_events_total", "Total number of SignalEvents received.");
@@ -33,8 +34,6 @@ public class SignalsService(
         string payload,
         CancellationToken cancellationToken = default)
     {
-        if (topic.StartsWith("sdhome/bridge", StringComparison.OrdinalIgnoreCase)) return;
-
         if (string.IsNullOrWhiteSpace(payload))
         {
             Log.Warning("Received empty payload on topic {Topic}. Skipping.", topic);
@@ -57,16 +56,19 @@ public class SignalsService(
             db.SignalEvents.Add(SignalEventEntity.FromModel(ev));
             await db.SaveChangesAsync(cancellationToken);
 
-            // 2. Project into specialized tables (triggers, readings, etc.)
-            await projectionService.ProjectAsync(ev, cancellationToken);
+            // 2. Broadcast to real-time clients (SignalR)
+            await realtimeBroadcaster.BroadcastSignalEventAsync(ev);
 
-            // 3. Forward to webhook (n8n) if configured
+            // 3. Project into specialized tables (triggers, readings, etc.)
+            var projectedData = await projectionService.ProjectAsync(ev, cancellationToken);
+
+            // 4. Forward to webhook (n8n) if configured
             if (!string.IsNullOrWhiteSpace(_n8nWebhookUrl))
             {
                 await SendToWebhookAsync(_n8nWebhookUrl, ev, cancellationToken);
             }
 
-            // 4. Pretty-print to console for local debugging
+            // 5. Pretty-print to console for local debugging
             PrintPrettyEvent(ev);
         }
         catch (JsonException)

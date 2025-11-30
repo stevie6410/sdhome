@@ -52,6 +52,9 @@ namespace SDHome.Lib.Data.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("device_type");
 
+                    b.Property<string>("DisplayName")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("FriendlyName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -94,6 +97,10 @@ namespace SDHome.Lib.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("updated_at");
 
+                    b.Property<int?>("ZoneId")
+                        .HasColumnType("int")
+                        .HasColumnName("zone_id");
+
                     b.HasKey("DeviceId");
 
                     b.HasIndex("DeviceType")
@@ -104,6 +111,9 @@ namespace SDHome.Lib.Data.Migrations
 
                     b.HasIndex("Room")
                         .HasDatabaseName("idx_devices_room");
+
+                    b.HasIndex("ZoneId")
+                        .HasDatabaseName("idx_devices_zone_id");
 
                     b.ToTable("devices", (string)null);
                 });
@@ -295,6 +305,90 @@ namespace SDHome.Lib.Data.Migrations
                         .HasDatabaseName("ix_trigger_events_type_timestamp");
 
                     b.ToTable("trigger_events", (string)null);
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.ZoneEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("icon");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("name");
+
+                    b.Property<int?>("ParentZoneId")
+                        .HasColumnType("int")
+                        .HasColumnName("parent_zone_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .HasDatabaseName("idx_zones_name");
+
+                    b.HasIndex("ParentZoneId")
+                        .HasDatabaseName("idx_zones_parent_zone_id");
+
+                    b.ToTable("zones", (string)null);
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.DeviceEntity", b =>
+                {
+                    b.HasOne("SDHome.Lib.Data.Entities.ZoneEntity", "Zone")
+                        .WithMany("Devices")
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.ZoneEntity", b =>
+                {
+                    b.HasOne("SDHome.Lib.Data.Entities.ZoneEntity", "ParentZone")
+                        .WithMany("ChildZones")
+                        .HasForeignKey("ParentZoneId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentZone");
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.ZoneEntity", b =>
+                {
+                    b.Navigation("ChildZones");
+
+                    b.Navigation("Devices");
                 });
 #pragma warning restore 612, 618
         }

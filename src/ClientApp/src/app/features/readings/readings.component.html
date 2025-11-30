@@ -1,0 +1,146 @@
+<div class="readings-page">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>📊 Sensor Readings</h1>
+        <p class="subtitle">Temperature, humidity, and environmental metrics</p>
+      </div>
+
+      <div class="header-controls">
+        <div class="connection-badge" [ngClass]="isConnected() ? 'connected' : 'disconnected'">
+          <span class="status-dot"></span>
+          <span>{{ isConnected() ? 'Live' : 'Offline' }}</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Metric Summary Cards -->
+  <div class="metrics-grid">
+    @for (summary of metricSummaries(); track summary.metric) {
+      <button
+        class="metric-card"
+        [class.selected]="selectedMetric() === summary.metric"
+        (click)="selectMetricCard(summary.metric)"
+      >
+        <div class="metric-icon">{{ summary.icon }}</div>
+        <div class="metric-content">
+          <span class="metric-value">{{ formatValue(summary.latest, summary.unit) }}</span>
+          <span class="metric-label">{{ summary.metric }}</span>
+        </div>
+        <div class="metric-trend" [ngClass]="summary.trend">
+          @switch (summary.trend) {
+            @case ('up') { ↑ }
+            @case ('down') { ↓ }
+            @default { — }
+          }
+        </div>
+      </button>
+    }
+  </div>
+
+  <!-- Control Bar -->
+  <div class="control-bar">
+    <div class="filters">
+      <!-- Search -->
+      <div class="search-input">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          placeholder="Search readings..."
+          [ngModel]="searchFilter()"
+          (ngModelChange)="searchFilter.set($event)"
+        />
+        @if (searchFilter()) {
+          <button class="clear-search" (click)="searchFilter.set('')">✕</button>
+        }
+      </div>
+
+      <!-- Metric Filter Dropdown -->
+      <div class="dropdown-wrapper">
+        <button class="dropdown-trigger" (click)="showMetricDropdown = !showMetricDropdown">
+          <span>{{ getSelectedMetricLabel() }}</span>
+          <span class="dropdown-arrow">▼</span>
+        </button>
+        @if (showMetricDropdown) {
+          <div class="dropdown-menu">
+            @for (metric of uniqueMetrics(); track metric.value) {
+              <button
+                class="dropdown-item"
+                [class.active]="metricFilter() === metric.value || (!metricFilter() && !metric.value)"
+                (click)="selectMetric(metric.value)"
+              >
+                {{ metric.label }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" (click)="refresh()" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner-sm"></span>
+        } @else {
+          🔄
+        }
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Readings Table -->
+  <div class="data-card">
+    <div class="table-container">
+      @if (loading()) {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>Loading readings...</span>
+        </div>
+      } @else if (filteredReadings().length === 0) {
+        <div class="empty-state">
+          <span class="empty-icon">📭</span>
+          <span class="empty-text">No readings found</span>
+          <span class="empty-hint">Sensor readings will appear here as devices report metrics</span>
+        </div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="col-time">Time</th>
+              <th class="col-device">Device</th>
+              <th class="col-metric">Metric</th>
+              <th class="col-value">Value</th>
+              <th class="col-unit">Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (reading of filteredReadings(); track trackReading($index, reading)) {
+              <tr class="reading-row animate-fadeIn">
+                <td class="col-time mono">
+                  {{ formatTimestamp(reading.timestampUtc) }}
+                </td>
+                <td class="col-device">
+                  <span class="device-name">{{ reading.deviceId || '-' }}</span>
+                </td>
+                <td class="col-metric">
+                  <span class="metric-badge">
+                    {{ getMetricIcon(reading.metric || '') }} {{ reading.metric || '-' }}
+                  </span>
+                </td>
+                <td class="col-value">
+                  <span class="value-display">{{ reading.value ?? '-' }}</span>
+                </td>
+                <td class="col-unit">
+                  <span class="unit-text">{{ reading.unit || '-' }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </div>
+</div>

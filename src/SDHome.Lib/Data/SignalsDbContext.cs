@@ -9,6 +9,7 @@ public class SignalsDbContext(DbContextOptions<SignalsDbContext> options) : DbCo
     public DbSet<SensorReadingEntity> SensorReadings => Set<SensorReadingEntity>();
     public DbSet<TriggerEventEntity> TriggerEvents => Set<TriggerEventEntity>();
     public DbSet<DeviceEntity> Devices => Set<DeviceEntity>();
+    public DbSet<ZoneEntity> Zones => Set<ZoneEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -115,6 +116,40 @@ public class SignalsDbContext(DbContextOptions<SignalsDbContext> options) : DbCo
             entity.HasIndex(e => e.Room).HasDatabaseName("idx_devices_room");
             entity.HasIndex(e => e.DeviceType).HasDatabaseName("idx_devices_device_type");
             entity.HasIndex(e => e.IsAvailable).HasDatabaseName("idx_devices_is_available");
+            
+            // Zone relationship
+            entity.Property(e => e.ZoneId).HasColumnName("zone_id");
+            entity.HasIndex(e => e.ZoneId).HasDatabaseName("idx_devices_zone_id");
+            entity.HasOne(e => e.Zone)
+                .WithMany(z => z.Devices)
+                .HasForeignKey(e => e.ZoneId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Zone configuration
+        modelBuilder.Entity<ZoneEntity>(entity =>
+        {
+            entity.ToTable("zones");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(1000);
+            entity.Property(e => e.Icon).HasColumnName("icon").HasMaxLength(100);
+            entity.Property(e => e.Color).HasColumnName("color").HasMaxLength(50);
+            entity.Property(e => e.ParentZoneId).HasColumnName("parent_zone_id");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2");
+
+            // Self-referencing relationship for hierarchy
+            entity.HasOne(e => e.ParentZone)
+                .WithMany(e => e.ChildZones)
+                .HasForeignKey(e => e.ParentZoneId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => e.ParentZoneId).HasDatabaseName("idx_zones_parent_zone_id");
+            entity.HasIndex(e => e.Name).HasDatabaseName("idx_zones_name");
         });
     }
 }

@@ -6,9 +6,10 @@ namespace SDHome.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class DevicesController(IDeviceService deviceService) : ControllerBase
+public class DevicesController(IDeviceService deviceService, IRealtimeEventBroadcaster broadcaster) : ControllerBase
 {
     private readonly IDeviceService _deviceService = deviceService;
+    private readonly IRealtimeEventBroadcaster _broadcaster = broadcaster;
 
     /// <summary>
     /// Get all devices
@@ -57,6 +58,36 @@ public class DevicesController(IDeviceService deviceService) : ControllerBase
     }
 
     /// <summary>
+    /// Rename a device in Zigbee2MQTT and local database
+    /// </summary>
+    [HttpPost("{deviceId}/rename")]
+    public async Task<ActionResult<Device>> RenameDevice(string deviceId, [FromBody] RenameDeviceRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.NewName))
+        {
+            return BadRequest(new { error = "New name is required" });
+        }
+
+        try
+        {
+            var device = await _deviceService.RenameDeviceAsync(deviceId, request.NewName);
+            return Ok(device);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Failed to rename device", details = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Get devices by room
     /// </summary>
     [HttpGet("by-room/{room}")]
@@ -77,12 +108,119 @@ public class DevicesController(IDeviceService deviceService) : ControllerBase
     }
 
     /// <summary>
-    /// Sync devices from Zigbee2MQTT
+    /// Sync devices from Zigbee2MQTT (legacy endpoint)
     /// </summary>
     [HttpPost("sync")]
     public async Task<ActionResult> SyncDevices()
     {
-        await _deviceService.SyncDevicesFromZigbee2MqttAsync();
-        return Ok(new { message = "Device sync completed" });
+        try
+        {
+            await _deviceService.SyncDevicesFromZigbee2MqttAsync();
+            var devices = await _deviceService.GetAllDevicesAsync();
+            return Ok(new { message = "Device sync completed", deviceCount = devices.Count() });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Device sync failed", details = ex.Message });
+        }
     }
+
+    /// <summary>
+    /// Sync devices from Zigbee2MQTT with real-time progress updates via SignalR
+    /// </summary>
+    [HttpPost("sync/realtime")]
+    public async Task<ActionResult> SyncDevicesRealtime()
+    {
+        try
+        {
+            var syncId = await _deviceService.SyncDevicesWithProgressAsync(_broadcaster);
+            var devices = await _deviceService.GetAllDevicesAsync();
+            return Ok(new { 
+                message = "Device sync completed", 
+                syncId,
+                deviceCount = devices.Count() 
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Device sync failed", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Start pairing mode to allow new Zigbee devices to join
+    /// </summary>
+    [HttpPost("pairing/start")]
+    public async Task<ActionResult> StartPairing([FromBody] StartPairingRequest? request)
+    {
+        try
+        {
+            var duration = request?.Duration ?? 120;
+            var pairingId = await _deviceService.StartPairingModeAsync(duration, _broadcaster);
+            return Ok(new { 
+                message = "Pairing mode started",
+                pairingId,
+                duration
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Failed to start pairing mode", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Stop pairing mode
+    /// </summary>
+    [HttpPost("pairing/stop")]
+    public async Task<ActionResult> StopPairing([FromBody] StopPairingRequest request)
+    {
+        try
+        {
+            await _deviceService.StopPairingModeAsync(request.PairingId, _broadcaster);
+            return Ok(new { message = "Pairing mode stopped" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Failed to stop pairing mode", details = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Check if pairing mode is active
+    /// </summary>
+    [HttpGet("pairing/status")]
+    public async Task<ActionResult> GetPairingStatus()
+    {
+        var isActive = await _deviceService.IsPairingActiveAsync();
+        return Ok(new { isActive });
+    }
+}
+
+/// <summary>
+/// Request to stop pairing mode
+/// </summary>
+public class StopPairingRequest
+{
+    public string PairingId { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Request to rename a device
+/// </summary>
+public class RenameDeviceRequest
+{
+    public string NewName { get; set; } = string.Empty;
 }

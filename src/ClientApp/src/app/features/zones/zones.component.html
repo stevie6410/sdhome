@@ -1,0 +1,244 @@
+<div class="zones-page">
+  <div class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>Zones</h1>
+        <p class="subtitle">Organize devices into hierarchical zones</p>
+      </div>
+      <div class="header-actions">
+        <a class="btn btn-secondary" routerLink="/zones/manage">
+          <span>📦</span> Assign Devices
+        </a>
+        <button class="btn btn-primary" (click)="openCreateDialog()">
+          <span>➕</span> Add Zone
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control Bar -->
+  <div class="control-bar">
+    <div class="filters">
+      <div class="search-input">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          placeholder="Search zones..."
+          [ngModel]="searchFilter()"
+          (ngModelChange)="searchFilter.set($event)"
+        />
+        @if (searchFilter()) {
+          <button class="clear-search" (click)="searchFilter.set('')">✕</button>
+        }
+      </div>
+    </div>
+    <div class="view-controls">
+      <div class="view-toggle">
+        <button
+          class="toggle-btn"
+          [class.active]="viewMode() === 'tree'"
+          (click)="viewMode.set('tree')"
+        >
+          🌳 Tree
+        </button>
+        <button
+          class="toggle-btn"
+          [class.active]="viewMode() === 'flat'"
+          (click)="viewMode.set('flat')"
+        >
+          📋 Flat
+        </button>
+      </div>
+      @if (viewMode() === 'tree') {
+        <div class="tree-controls">
+          <button class="btn btn-text" (click)="expandAll()">Expand All</button>
+          <button class="btn btn-text" (click)="collapseAll()">Collapse All</button>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Zones List -->
+  <div class="zones-container">
+    @if (loading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <span>Loading zones...</span>
+      </div>
+    } @else if (filteredZones().length === 0) {
+      <div class="empty-state">
+        <span class="empty-icon">🏠</span>
+        <span class="empty-text">No zones found</span>
+        <p class="empty-hint">Create zones to organize your devices into rooms, floors, or buildings.</p>
+        <button class="btn btn-primary" (click)="openCreateDialog()">Create First Zone</button>
+      </div>
+    } @else {
+      <div class="zones-list">
+        @for (zone of filteredZones(); track zone.id; let i = $index) {
+          @if (viewMode() === 'flat' || isVisible(zone)) {
+            <div
+              class="zone-card"
+              [style.margin-left.px]="viewMode() === 'tree' ? (zone.depth ?? 0) * 24 : 0"
+              [style.border-left-color]="zone.color || 'var(--border-secondary)'"
+            >
+              <div class="zone-header">
+                @if (viewMode() === 'tree' && hasChildren(zone)) {
+                  <button class="expand-btn" (click)="toggleExpand(zone.id)">
+                    {{ isExpanded(zone.id) ? '▼' : '▶' }}
+                  </button>
+                } @else if (viewMode() === 'tree') {
+                  <span class="expand-placeholder"></span>
+                }
+
+                <span class="zone-icon" [style.background]="zone.color || 'var(--surface-2)'">
+                  {{ zone.icon || '🏠' }}
+                </span>
+
+                <div class="zone-info">
+                  <span class="zone-name">{{ zone.name }}</span>
+                  @if (zone.description) {
+                    <span class="zone-description">{{ zone.description }}</span>
+                  }
+                  @if (viewMode() === 'flat' && zone.parentZone) {
+                    <span class="zone-path">{{ getZonePath(zone) }}</span>
+                  }
+                </div>
+
+                <div class="zone-actions">
+                  <button class="btn btn-icon" title="Add child zone" (click)="openCreateDialog(zone.id)">
+                    ➕
+                  </button>
+                  <button class="btn btn-icon" title="Edit zone" (click)="openEditDialog(zone)">
+                    ✏️
+                  </button>
+                  <button class="btn btn-icon btn-danger" title="Delete zone" (click)="deleteZone(zone)">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Create/Edit Dialog -->
+@if (showDialog()) {
+  <div class="dialog-overlay" (click)="closeDialog()">
+    <div class="dialog" (click)="$event.stopPropagation()">
+      <div class="dialog-header">
+        <h2>{{ dialogMode() === 'create' ? 'Create Zone' : 'Edit Zone' }}</h2>
+        <button class="dialog-close" (click)="closeDialog()">✕</button>
+      </div>
+
+      <div class="dialog-body">
+        <div class="form-group">
+          <label>Name *</label>
+          <input
+            type="text"
+            [ngModel]="formName()"
+            (ngModelChange)="formName.set($event)"
+            placeholder="e.g., Front Room, Downstairs, Main House"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Description</label>
+          <input
+            type="text"
+            [ngModel]="formDescription()"
+            (ngModelChange)="formDescription.set($event)"
+            placeholder="Optional description"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Parent Zone</label>
+          <select
+            [ngModel]="formParentZoneId()"
+            (ngModelChange)="formParentZoneId.set($event ? +$event : null)"
+          >
+            <option [ngValue]="null">— No parent (root zone) —</option>
+            @for (zone of availableParentZones(); track zone.id) {
+              <option [ngValue]="zone.id">
+                {{ zone.parentZone ? getZonePath(zone) : zone.name }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Icon</label>
+            <div class="icon-picker">
+              <div class="icon-preview" [style.background]="formColor()">
+                {{ formIcon() || '🏠' }}
+              </div>
+              <div class="icon-presets">
+                @for (icon of iconPresets; track icon) {
+                  <button
+                    class="icon-btn"
+                    [class.selected]="formIcon() === icon"
+                    (click)="selectIcon(icon)"
+                  >
+                    {{ icon }}
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Color</label>
+            <div class="color-picker">
+              <input
+                type="color"
+                [ngModel]="formColor()"
+                (ngModelChange)="formColor.set($event)"
+                class="color-input"
+              />
+              <div class="color-presets">
+                @for (color of colorPresets; track color) {
+                  <button
+                    class="color-btn"
+                    [style.background]="color"
+                    [class.selected]="formColor() === color"
+                    (click)="selectColor(color)"
+                  >
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Sort Order</label>
+          <input
+            type="number"
+            [ngModel]="formSortOrder()"
+            (ngModelChange)="formSortOrder.set($event)"
+            min="0"
+          />
+          <span class="form-hint">Lower numbers appear first</span>
+        </div>
+      </div>
+
+      <div class="dialog-footer">
+        <button class="btn btn-secondary" (click)="closeDialog()">Cancel</button>
+        <button
+          class="btn btn-primary"
+          (click)="saveZone()"
+          [disabled]="saving() || !formName().trim()"
+        >
+          @if (saving()) {
+            <span class="spinner-sm"></span>
+          }
+          {{ dialogMode() === 'create' ? 'Create' : 'Save' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

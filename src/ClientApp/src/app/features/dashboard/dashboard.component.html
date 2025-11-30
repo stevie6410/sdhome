@@ -1,0 +1,196 @@
+<div class="dashboard-page">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>
+          <i class="pi pi-home"></i>
+          SDHome Dashboard
+        </h1>
+        <p class="subtitle">Your smart home automation control center</p>
+      </div>
+
+      <div class="connection-status" [ngClass]="connectionState()">
+        <span class="status-dot"></span>
+        <span class="status-text">{{ connectionState() === 'connected' ? 'Real-time Connected' : 'Connecting...' }}</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid">
+    <a routerLink="/signals" class="stat-card signals">
+      <div class="stat-glow"></div>
+      <div class="stat-icon">
+        <i class="pi pi-bolt"></i>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">Signal Events</span>
+        <span class="stat-value">{{ signalCount() || '—' }}</span>
+        @if (liveSignals().length > 0) {
+          <span class="stat-live">+{{ liveSignals().length }} live</span>
+        }
+      </div>
+      <i class="pi pi-arrow-right stat-arrow"></i>
+    </a>
+
+    <a routerLink="/readings" class="stat-card readings">
+      <div class="stat-glow"></div>
+      <div class="stat-icon">
+        <i class="pi pi-chart-line"></i>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">Sensor Readings</span>
+        <span class="stat-value">{{ readingCount() || '—' }}</span>
+        @if (liveReadings().length > 0) {
+          <span class="stat-live">+{{ liveReadings().length }} live</span>
+        }
+      </div>
+      <i class="pi pi-arrow-right stat-arrow"></i>
+    </a>
+
+    <a routerLink="/triggers" class="stat-card triggers">
+      <div class="stat-glow"></div>
+      <div class="stat-icon">
+        <i class="pi pi-bell"></i>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">Trigger Events</span>
+        <span class="stat-value">{{ triggerCount() || '—' }}</span>
+        @if (liveTriggers().length > 0) {
+          <span class="stat-live">+{{ liveTriggers().length }} live</span>
+        }
+      </div>
+      <i class="pi pi-arrow-right stat-arrow"></i>
+    </a>
+
+    <a routerLink="/devices" class="stat-card devices">
+      <div class="stat-glow"></div>
+      <div class="stat-icon">
+        <i class="pi pi-microchip"></i>
+      </div>
+      <div class="stat-content">
+        <span class="stat-label">Devices</span>
+        <span class="stat-value">{{ deviceCount() }}</span>
+        @if (onlineDevices() > 0) {
+          <span class="stat-sub">{{ onlineDevices() }} online</span>
+        }
+      </div>
+      <i class="pi pi-arrow-right stat-arrow"></i>
+    </a>
+  </div>
+
+  <div class="content-grid">
+    <!-- Recent Activity -->
+    <div class="activity-section">
+      <div class="section-header">
+        <h2>
+          <i class="pi pi-history"></i>
+          Live Activity
+        </h2>
+        @if (isConnected()) {
+          <div class="live-badge">
+            <span class="live-dot"></span>
+            LIVE
+          </div>
+        }
+      </div>
+
+      <div class="activity-list">
+        @for (item of recentActivity(); track $index) {
+          <div class="activity-item" [attr.data-color]="item.color">
+            <div class="activity-icon">
+              <i class="pi" [ngClass]="item.icon"></i>
+            </div>
+            <div class="activity-content">
+              <span class="activity-title">{{ item.title }}</span>
+              <span class="activity-subtitle">{{ item.subtitle }}</span>
+            </div>
+            <span class="activity-time">{{ formatTime(item.time) }}</span>
+          </div>
+        } @empty {
+          <div class="empty-activity">
+            <i class="pi pi-inbox"></i>
+            <span>Waiting for events...</span>
+            <small>Real-time events will appear here</small>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Quick Navigation -->
+    <div class="nav-section">
+      <div class="section-header">
+        <h2>
+          <i class="pi pi-th-large"></i>
+          Quick Navigation
+        </h2>
+      </div>
+
+      <div class="nav-grid">
+        <a routerLink="/signals" class="nav-card">
+          <div class="nav-icon cyan">
+            <i class="pi pi-bolt"></i>
+          </div>
+          <div class="nav-content">
+            <span class="nav-title">Signal Monitor</span>
+            <span class="nav-desc">Real-time event stream</span>
+          </div>
+        </a>
+
+        <a routerLink="/readings" class="nav-card">
+          <div class="nav-icon green">
+            <i class="pi pi-chart-line"></i>
+          </div>
+          <div class="nav-content">
+            <span class="nav-title">Sensor Readings</span>
+            <span class="nav-desc">Environmental metrics</span>
+          </div>
+        </a>
+
+        <a routerLink="/triggers" class="nav-card">
+          <div class="nav-icon magenta">
+            <i class="pi pi-bell"></i>
+          </div>
+          <div class="nav-content">
+            <span class="nav-title">Trigger Events</span>
+            <span class="nav-desc">Motion & contact events</span>
+          </div>
+        </a>
+
+        <a routerLink="/devices" class="nav-card">
+          <div class="nav-icon orange">
+            <i class="pi pi-microchip"></i>
+          </div>
+          <div class="nav-content">
+            <span class="nav-title">Devices</span>
+            <span class="nav-desc">Manage Zigbee devices</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- System Status -->
+      <div class="system-status">
+        <h3>System Status</h3>
+        <div class="status-grid">
+          <div class="status-item">
+            <i class="pi pi-check-circle success"></i>
+            <span>API Online</span>
+          </div>
+          <div class="status-item">
+            <i class="pi pi-check-circle success"></i>
+            <span>Database Connected</span>
+          </div>
+          <div class="status-item">
+            <i class="pi" [ngClass]="isConnected() ? 'pi-check-circle success' : 'pi-spin pi-spinner warning'"></i>
+            <span>SignalR {{ isConnected() ? 'Connected' : 'Connecting' }}</span>
+          </div>
+          <div class="status-item">
+            <i class="pi pi-info-circle info"></i>
+            <span>MQTT Broker</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

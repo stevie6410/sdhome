@@ -1,0 +1,184 @@
+@if (isOpen()) {
+  <div class="modal-backdrop" (click)="close()"></div>
+  <div class="modal pairing-dialog">
+    <div class="modal-header">
+      <h3>
+        <span class="header-icon">📡</span>
+        Pair New Device
+      </h3>
+      <button class="close-btn" (click)="close()" [disabled]="starting() || stopping()">×</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Pre-pairing state -->
+      @if (!isPairing() && !hasEnded()) {
+        <div class="pairing-intro">
+          <div class="intro-icon">🔗</div>
+          <h4>Ready to pair a new Zigbee device</h4>
+          <p>Select how long to enable pairing mode, then put your device into pairing mode.</p>
+
+          <div class="duration-selector">
+            <label>Pairing duration:</label>
+            <div class="duration-presets">
+              @for (preset of durationPresets; track preset.value) {
+                <button
+                  class="preset-btn"
+                  [class.active]="duration() === preset.value"
+                  (click)="setDuration(preset.value)">
+                  {{ preset.label }}
+                </button>
+              }
+            </div>
+          </div>
+
+          <button
+            class="btn btn-primary btn-lg start-btn"
+            (click)="startPairing()"
+            [disabled]="starting()">
+            @if (starting()) {
+              <span class="spinner"></span>
+              Starting...
+            } @else {
+              <span class="btn-icon">🚀</span>
+              Start Pairing
+            }
+          </button>
+        </div>
+      }
+
+      <!-- Active pairing state -->
+      @if (isPairing()) {
+        <div class="pairing-active" [class]="statusClass()">
+          <!-- Countdown ring -->
+          <div class="countdown-container">
+            <svg class="countdown-ring" viewBox="0 0 100 100">
+              <circle
+                class="countdown-bg"
+                cx="50" cy="50" r="45"
+                fill="none"
+                stroke-width="8"/>
+              <circle
+                class="countdown-progress"
+                cx="50" cy="50" r="45"
+                fill="none"
+                stroke-width="8"
+                stroke-linecap="round"
+                [attr.stroke-dasharray]="283"
+                [attr.stroke-dashoffset]="283 - (283 * progressPercent() / 100)"/>
+            </svg>
+            <div class="countdown-inner">
+              <div class="countdown-time">{{ formatTime(progress()?.remainingSeconds ?? 0) }}</div>
+              <div class="countdown-label">remaining</div>
+            </div>
+          </div>
+
+          <!-- Status message -->
+          <div class="status-message">
+            <span class="status-icon">{{ statusIcon() }}</span>
+            <span class="status-text">{{ progress()?.message }}</span>
+          </div>
+
+          <!-- Discovery stats -->
+          <div class="discovery-stats">
+            <div class="stat">
+              <span class="stat-value">{{ discoveredCount() }}</span>
+              <span class="stat-label">Discovered</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ pairedCount() }}</span>
+              <span class="stat-label">Paired</span>
+            </div>
+          </div>
+
+          <!-- Current device being interviewed -->
+          @if (progress()?.currentDevice; as device) {
+            <div class="current-device" [class]="getDeviceStatusClass(device.status)">
+              <div class="device-status-icon">{{ getDeviceStatusIcon(device.status) }}</div>
+              <div class="device-info">
+                <div class="device-name">{{ device.friendlyName || device.ieeeAddress }}</div>
+                <div class="device-status">{{ device.status }}</div>
+              </div>
+            </div>
+          }
+
+          <!-- Stop button -->
+          <button
+            class="btn btn-secondary stop-btn"
+            (click)="stopPairing()"
+            [disabled]="stopping()">
+            @if (stopping()) {
+              <span class="spinner"></span>
+              Stopping...
+            } @else {
+              <span class="btn-icon">⏹️</span>
+              Stop Pairing
+            }
+          </button>
+        </div>
+      }
+
+      <!-- Ended state -->
+      @if (hasEnded()) {
+        <div class="pairing-ended" [class]="statusClass()">
+          <div class="ended-icon">{{ statusIcon() }}</div>
+          <h4>{{ progress()?.status === 'Failed' ? 'Pairing Failed' : 'Pairing Complete' }}</h4>
+          <p>{{ progress()?.message }}</p>
+
+          @if (progress()?.error) {
+            <div class="error-message">
+              <span class="error-icon">⚠️</span>
+              {{ progress()?.error }}
+            </div>
+          }
+
+          <!-- Discovered devices list -->
+          @if (progress()?.discoveredDevices?.length) {
+            <div class="discovered-devices">
+              <h5>Discovered Devices ({{ progress()?.discoveredDevices?.length }})</h5>
+              <div class="device-list">
+                @for (device of progress()?.discoveredDevices; track trackDevice($index, device)) {
+                  <div class="device-item" [class]="getDeviceStatusClass(device.status)">
+                    <span class="device-icon">{{ getDeviceStatusIcon(device.status) }}</span>
+                    <div class="device-details">
+                      <span class="device-name">{{ device.friendlyName || device.ieeeAddress }}</span>
+                      @if (device.manufacturer || device.model) {
+                        <span class="device-meta">{{ device.manufacturer }} {{ device.model }}</span>
+                      }
+                    </div>
+                    <span class="device-badge" [class]="'badge-' + device.status.toLowerCase()">
+                      {{ device.status }}
+                    </span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <div class="ended-actions">
+            <button class="btn btn-outline" (click)="close()">Close</button>
+            <button class="btn btn-primary" (click)="startPairing()">Pair Another</button>
+          </div>
+        </div>
+      }
+
+      <!-- Instructions sidebar -->
+      @if (isPairing()) {
+        <div class="pairing-instructions">
+          <h5>💡 How to pair your device</h5>
+          <ol>
+            <li>Make sure your device is powered on</li>
+            <li>Put your device into pairing mode:
+              <ul>
+                <li><strong>Sensors:</strong> Press and hold the reset button for 5+ seconds</li>
+                <li><strong>Bulbs:</strong> Turn on/off 5 times quickly</li>
+                <li><strong>Switches:</strong> Hold the button until LED blinks</li>
+              </ul>
+            </li>
+            <li>Wait for the device to appear above</li>
+            <li>Device will be automatically configured</li>
+          </ol>
+        </div>
+      }
+    </div>
+  </div>
+}

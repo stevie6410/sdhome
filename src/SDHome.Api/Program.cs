@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.SpaServices.Extensions;
 using Microsoft.EntityFrameworkCore;
 using SDHome.Api.HealthChecks;
+using SDHome.Api.Hubs;
+using SDHome.Api.Services;
 using SDHome.Lib.Data;
 using SDHome.Lib.Mappers;
 using SDHome.Lib.Models;
@@ -14,9 +16,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy("DevCors", policy =>
     {
         policy
-            .AllowAnyOrigin()
+            .WithOrigins("http://localhost:4200", "http://localhost:5176")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -28,7 +31,7 @@ builder.Services.AddOpenApiDocument(options =>
 {
     options.Title = "SDHome API";
     options.Version = "v1";
-    options.DocumentName = "v1";  // <-- matches nswag.json documentName
+    options.DocumentName = "v1";
 });
 
 builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Signals:Mqtt"));
@@ -39,16 +42,7 @@ builder.Services.Configure<MetricsOptions>(builder.Configuration.GetSection("Met
 
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-
-// NSwag OpenAPI generator
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddOpenApiDocument(options =>
-{
-    options.Title = "SDHome API";
-    options.Version = "v1";
-    options.DocumentName = "v1";  // <-- matches nswag.json documentName
-});
+builder.Services.AddSignalR();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -62,6 +56,9 @@ builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<ISignalEventProjectionService, SignalEventProjectionService>();
 builder.Services.AddScoped<ISignalsService, SignalsService>();
 builder.Services.AddScoped<DatabaseSeeder>();
+
+// SignalR real-time event broadcaster
+builder.Services.AddSingleton<IRealtimeEventBroadcaster, SignalREventBroadcaster>();
 
 // HttpClient for webhook calls
 builder.Services.AddHttpClient<ISignalsService, SignalsService>();
@@ -92,15 +89,24 @@ var app = builder.Build();
 
 app.UseCors("DevCors");
 
-// Ensure SQL Server table/indexes exist at startup
-// Using EF Core migrations - apply pending migrations
-// Only ensure DB in normal runtime, not during NSwag or design-time builds
+// Apply pending EF Core migrations at startup
+// Skip during NSwag generation or design-time builds
 if (!app.Environment.IsEnvironment("NSwag"))
 {
-    using (var scope = app.Services.CreateScope())
+    try
     {
+        using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<SignalsDbContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        
+        logger.LogInformation("Applying database migrations...");
         await dbContext.Database.MigrateAsync();
+        logger.LogInformation("Database migrations applied successfully");
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Failed to apply database migrations. API will start but database operations may fail.");
     }
 }
 
@@ -110,9 +116,14 @@ app.UseSwaggerUi();      // serves Swagger UI at /swagger
 
 app.UseHttpsRedirection();
 
+app.UseRouting();
+
 app.UseAuthorization();
 
 app.MapControllers();
+
+// SignalR hub for real-time events
+app.MapHub<SignalsHub>("/hubs/signals");
 
 // Health check endpoints
 app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
@@ -145,21 +156,27 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
     Predicate = _ => false // Just checks if the app is running
 });
 
-// Serve Angular SPA
-app.UseStaticFiles();
-
-if (!app.Environment.IsEnvironment("NSwag"))
-{
-    app.UseSpa(spa =>
+// Serve Angular SPA - must be after all API/hub endpoints
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/api") &&
+               !context.Request.Path.StartsWithSegments("/health") &&
+               !context.Request.Path.StartsWithSegments("/swagger") &&
+               !context.Request.Path.StartsWithSegments("/hubs"),
+    spaApp =>
     {
-        spa.Options.SourcePath = "../ClientApp";
-
-        if (app.Environment.IsDevelopment())
+        spaApp.UseStaticFiles();
+        spaApp.UseSpa(spa =>
         {
-            // Proxy to Angular dev server during development
-            spa.UseProxyToSpaDevelopmentServer("http://localhost:4200");
-        }
+            spa.Options.SourcePath = "../ClientApp";
+
+            // Only proxy to Angular dev server if explicitly requested via environment variable
+            // Set PROXY_TO_SPA=true to enable (used by "Full Stack" launch config)
+            var proxySpa = Environment.GetEnvironmentVariable("PROXY_TO_SPA") == "true";
+            if (proxySpa)
+            {
+                spa.UseProxyToSpaDevelopmentServer("http://localhost:4200");
+            }
+        });
     });
-}
 
 app.Run();

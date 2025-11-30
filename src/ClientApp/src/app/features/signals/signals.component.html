@@ -1,0 +1,380 @@
+<div class="signals-page">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>⚡ Live Signal Monitor</h1>
+        <p class="subtitle">Real-time event stream from your smart home</p>
+      </div>
+
+      <div class="header-controls">
+        <div class="connection-badge" [ngClass]="connectionState()">
+          <span class="status-dot"></span>
+          <span>{{ connectionState() === 'connected' ? 'Live' : 'Connecting...' }}</span>
+        </div>
+
+        @if (liveCount() > 0) {
+          <span class="live-counter">+{{ liveCount() }} live</span>
+        }
+      </div>
+    </div>
+  </header>
+
+  <!-- Control Bar -->
+  <div class="control-bar">
+    <div class="filters">
+      <!-- Search -->
+      <div class="search-input">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          placeholder="Search signals..."
+          [ngModel]="searchFilter()"
+          (ngModelChange)="searchFilter.set($event)"
+        />
+        @if (searchFilter()) {
+          <button class="clear-search" (click)="searchFilter.set('')">✕</button>
+        }
+      </div>
+
+      <!-- Hide System Messages Toggle -->
+      <label class="toggle-switch">
+        <input
+          type="checkbox"
+          [ngModel]="hideSystemMessages()"
+          (ngModelChange)="hideSystemMessages.set($event)"
+        />
+        <span class="toggle-slider"></span>
+        <span class="toggle-label">Hide bridge messages</span>
+      </label>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-secondary" (click)="toggleConsole()">
+        🖥️ Console
+      </button>
+      <button class="btn btn-secondary" (click)="togglePause()">
+        {{ paused() ? '▶️ Resume' : '⏸️ Pause' }}
+      </button>
+      <button class="btn btn-secondary" (click)="clearLive()" [disabled]="liveCount() === 0">
+        🗑️ Clear Live
+      </button>
+      <button class="btn btn-primary" (click)="refresh()" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner-sm"></span>
+        } @else {
+          🔄
+        }
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Signals Table -->
+  <div class="data-card">
+    <div class="table-container">
+      @if (loading()) {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>Loading signals...</span>
+        </div>
+      } @else if (filteredSignals().length === 0) {
+        <div class="empty-state">
+          <span class="empty-icon">�</span>
+          <span class="empty-text">No signals found</span>
+          <span class="empty-hint">Waiting for events from your devices...</span>
+        </div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="col-time">Time</th>
+              <th class="col-topic">Topic</th>
+              <th class="col-device">Device</th>
+              <th class="col-type">Event Type</th>
+              <th class="col-capability">Capability</th>
+              <th class="col-value">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (signal of filteredSignals(); track trackSignal($index, signal)) {
+              <tr
+                class="signal-row animate-fadeIn clickable"
+                [class.selected]="selectedSignal()?.id === signal.id"
+                (click)="selectSignal(signal)"
+              >
+                <td class="col-time mono">
+                  {{ formatTimestamp(signal.timestampUtc) }}
+                </td>
+                <td class="col-topic">
+                  <span class="topic-path mono">{{ signal.rawTopic || '-' }}</span>
+                </td>
+                <td class="col-device">
+                  <span class="device-name">{{ signal.deviceId || '-' }}</span>
+                </td>
+                <td class="col-type">
+                  <span class="tag" [ngClass]="'tag-' + getEventTypeClass(signal.eventType)">
+                    {{ signal.eventType || '-' }}
+                  </span>
+                </td>
+                <td class="col-capability">
+                  {{ signal.capability || '-' }}
+                </td>
+                <td class="col-value">
+                  @if (signal.value !== undefined && signal.value !== null) {
+                    <span class="value-badge">{{ signal.value }}</span>
+                  } @else {
+                    <span class="text-muted">-</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  </div>
+
+  <!-- Signal Detail Panel -->
+  @if (selectedSignal(); as signal) {
+    <div class="detail-overlay" (click)="closeDetail()"></div>
+    <div class="detail-panel">
+      <div class="detail-header">
+        <h2>📋 Signal Details</h2>
+        <div class="header-actions">
+          <button
+            class="btn btn-secondary copy-btn"
+            (click)="copyJsonToClipboard(signal)"
+            [class.success]="showCopySuccess()"
+          >
+            @if (showCopySuccess()) {
+              ✓ Copied!
+            } @else {
+              📄 Copy JSON
+            }
+          </button>
+          <button class="close-btn" (click)="closeDetail()">✕</button>
+        </div>
+      </div>
+
+      <div class="detail-content">
+        <!-- Summary Section -->
+        <div class="detail-section">
+          <h3>Summary</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">ID</span>
+              <span class="detail-value mono">{{ signal.id || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Timestamp</span>
+              <span class="detail-value">{{ formatFullTimestamp(signal.timestampUtc) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Topic</span>
+              <span class="detail-value mono">{{ signal.rawTopic || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Source</span>
+              <span class="detail-value">{{ signal.source || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Device Section -->
+        <div class="detail-section">
+          <h3>Device Info</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Device ID</span>
+              <span class="detail-value">{{ signal.deviceId || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Location</span>
+              <span class="detail-value">{{ signal.location || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Device Kind</span>
+              <span class="detail-value">{{ signal.deviceKind || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Event Section -->
+        <div class="detail-section">
+          <h3>Event Info</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Capability</span>
+              <span class="detail-value">{{ signal.capability || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Event Type</span>
+              <span class="detail-value">
+                <span class="tag" [ngClass]="'tag-' + getEventTypeClass(signal.eventType)">
+                  {{ signal.eventType || '-' }}
+                </span>
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Event Sub-Type</span>
+              <span class="detail-value">{{ signal.eventSubType || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Event Category</span>
+              <span class="detail-value">{{ signal.eventCategory || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Value</span>
+              <span class="detail-value">
+                @if (signal.value !== undefined && signal.value !== null) {
+                  <span class="value-badge">{{ signal.value }}</span>
+                } @else {
+                  -
+                }
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Raw Payload Section -->
+        <div class="detail-section">
+          <h3>Raw Payload</h3>
+          <pre class="payload-block">{{ formatJson(signal.rawPayload) }}</pre>
+        </div>
+
+        @if (signal.rawPayloadArray) {
+          <div class="detail-section">
+            <h3>Raw Payload Array</h3>
+            <pre class="payload-block">{{ formatJson(signal.rawPayloadArray) }}</pre>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- MQTT Console Panel -->
+  @if (consoleOpen()) {
+    <div class="console-panel">
+      <div class="console-header">
+        <div class="console-title">
+          <h3>🖥️ MQTT Console</h3>
+          @if (mqttStatus(); as status) {
+            <span class="mqtt-status" [class.connected]="status.connected" [class.error]="!status.connected">
+              {{ status.connected ? '● Connected' : '○ Disconnected' }}
+              @if (status.host) {
+                <span class="mqtt-host">({{ status.host }}:{{ status.port }})</span>
+              }
+            </span>
+          }
+        </div>
+        <div class="console-header-actions">
+          <button class="btn btn-secondary btn-sm" (click)="testMqttConnection()">
+            🔌 Test Connection
+          </button>
+          <button class="btn btn-primary btn-sm" (click)="syncDevices()">
+            📥 Sync Devices
+          </button>
+          <button class="close-btn" (click)="toggleConsole()">✕</button>
+        </div>
+      </div>
+
+      <div class="console-body">
+        <!-- Preset Commands -->
+        <div class="console-presets">
+          <span class="presets-label">Quick Commands:</span>
+          <div class="preset-buttons">
+            @for (preset of presetCommands; track preset.topic) {
+              <button
+                class="preset-btn"
+                (click)="applyPreset(preset)"
+                [title]="preset.topic"
+              >
+                {{ preset.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Input Form -->
+        <div class="console-form">
+          <div class="form-group">
+            <label>Topic</label>
+            <input
+              type="text"
+              [ngModel]="consoleTopic()"
+              (ngModelChange)="consoleTopic.set($event)"
+              placeholder="zigbee2mqtt/bridge/request/devices"
+              class="console-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Payload (JSON or text)</label>
+            <textarea
+              [ngModel]="consolePayload()"
+              (ngModelChange)="consolePayload.set($event)"
+              placeholder='{"key": "value"}'
+              class="console-textarea"
+              rows="3"
+            ></textarea>
+          </div>
+
+          <div class="form-actions">
+            <label class="retain-checkbox">
+              <input
+                type="checkbox"
+                [ngModel]="consoleRetain()"
+                (ngModelChange)="consoleRetain.set($event)"
+              />
+              Retain
+            </label>
+            <button
+              class="btn btn-primary send-btn"
+              (click)="sendCommand()"
+              [disabled]="consoleSending()"
+            >
+              @if (consoleSending()) {
+                <span class="spinner-sm"></span>
+                Sending...
+              } @else {
+                📤 Send
+              }
+            </button>
+          </div>
+        </div>
+
+        <!-- Console History -->
+        <div class="console-history">
+          <div class="history-header">
+            <span>History</span>
+            <button class="clear-history-btn" (click)="clearConsoleHistory()">Clear</button>
+          </div>
+          <div class="history-entries">
+            @for (entry of consoleHistory(); track entry.id) {
+              <div class="history-entry" [ngClass]="'entry-' + entry.type">
+                <span class="entry-time">{{ formatConsoleTime(entry.timestamp) }}</span>
+                @if (entry.type === 'sent') {
+                  <span class="entry-icon">📤</span>
+                  <span class="entry-topic">{{ entry.topic }}</span>
+                  @if (entry.payload) {
+                    <span class="entry-payload">{{ entry.payload }}</span>
+                  }
+                } @else if (entry.type === 'response') {
+                  <span class="entry-icon">✓</span>
+                  <span class="entry-message success">{{ entry.message }}</span>
+                } @else {
+                  <span class="entry-icon">✗</span>
+                  <span class="entry-message error">{{ entry.message }}</span>
+                }
+              </div>
+            }
+            @if (consoleHistory().length === 0) {
+              <div class="history-empty">No commands sent yet</div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+</div>

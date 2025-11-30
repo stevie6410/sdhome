@@ -1,14 +1,27 @@
 {
   "/api": {
-    "target": "https://localhost:5000",
+    "target": "http://localhost:5176",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"
   },
   "/swagger": {
-    "target": "https://localhost:5000",
+    "target": "http://localhost:5176",
     "secure": false,
     "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/health": {
+    "target": "http://localhost:5176",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/hubs": {
+    "target": "http://localhost:5176",
+    "secure": false,
+    "changeOrigin": true,
+    "ws": true,
     "logLevel": "debug"
   }
 }

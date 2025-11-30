@@ -14,7 +14,6 @@ public class SignalsController(SignalsDbContext db) : ControllerBase
     {
         return await db.SignalEvents
             .AsNoTracking()
-            .Where(e => !e.DeviceId.StartsWith("bridge/"))
             .OrderByDescending(e => e.TimestampUtc)
             .Take(take)
             .Select(e => e.ToModel())

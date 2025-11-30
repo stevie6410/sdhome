@@ -1,0 +1,262 @@
+<div class="zone-manager">
+  <div class="page-header">
+    <div class="header-content">
+      <div class="header-title">
+        <h1>Device Assignment</h1>
+        <p class="subtitle">Drag devices to assign them to zones</p>
+      </div>
+      <div class="header-actions">
+        <div class="view-toggle">
+          <button
+            class="toggle-btn"
+            [class.active]="zoneViewMode() === 'nested'"
+            (click)="zoneViewMode.set('nested')"
+            title="Nested boxes view"
+          >
+            ⊞ Nested
+          </button>
+          <button
+            class="toggle-btn"
+            [class.active]="zoneViewMode() === 'tree'"
+            (click)="zoneViewMode.set('tree')"
+            title="Tree list view"
+          >
+            ☰ Tree
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <span>Loading...</span>
+    </div>
+  } @else {
+    <div class="manager-layout">
+      <!-- Unassigned Devices Panel -->
+      <div class="devices-panel">
+        <div class="panel-header">
+          <h2>📦 Unassigned Devices</h2>
+          <span class="device-count">{{ unassignedDevices().length }}</span>
+        </div>
+
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            placeholder="Search devices..."
+            [ngModel]="deviceSearch()"
+            (ngModelChange)="deviceSearch.set($event)"
+          />
+          @if (deviceSearch()) {
+            <button class="clear-btn" (click)="deviceSearch.set('')">✕</button>
+          }
+        </div>
+
+        <div
+          class="device-list"
+          cdkDropList
+          id="unassigned-list"
+          [cdkDropListData]="unassignedDevices()"
+          [cdkDropListConnectedTo]="allDropListIds()"
+          (cdkDropListDropped)="onDeviceDropped($event, null)"
+          (cdkDropListEntered)="onDragEnterZone(null)"
+          [class.drop-target]="highlightedZoneId() === null && draggingDevice()"
+        >
+          @for (device of unassignedDevices(); track device.deviceId) {
+            <div
+              class="device-card draggable"
+              cdkDrag
+              [cdkDragData]="device"
+              (cdkDragStarted)="onDragStarted(device)"
+              (cdkDragEnded)="onDragEnded()"
+            >
+              <span class="device-icon">{{ getDeviceIcon(device.deviceType) }}</span>
+              <div class="device-info">
+                <span class="device-name">{{ device.friendlyName }}</span>
+                <span class="device-meta">
+                  @if (device.manufacturer) { {{ device.manufacturer }} }
+                  @if (device.deviceType) { · {{ device.deviceType }} }
+                </span>
+              </div>
+              <span class="drag-handle">⋮⋮</span>
+
+              <!-- Drag placeholder -->
+              <div class="device-placeholder" *cdkDragPlaceholder></div>
+            </div>
+          }
+
+          @if (unassignedDevices().length === 0) {
+            <div class="empty-devices">
+              @if (deviceSearch()) {
+                <span>No devices match "{{ deviceSearch() }}"</span>
+              } @else {
+                <span>All devices are assigned! 🎉</span>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Zones Panel -->
+      <div class="zones-panel" [class.nested-view]="zoneViewMode() === 'nested'">
+        <div class="panel-header">
+          <h2>🏠 Zones</h2>
+        </div>
+
+        @if (zoneViewMode() === 'tree') {
+          <!-- Tree View -->
+          <div class="zones-tree">
+            @for (zone of zones(); track zone.id) {
+              <ng-container *ngTemplateOutlet="zoneTreeTemplate; context: { zone: zone, depth: 0 }"></ng-container>
+            }
+          </div>
+        } @else {
+          <!-- Nested Boxes View -->
+          <div class="zones-nested">
+            <!-- Debug: showing {{ zones().length }} root zones -->
+            @for (zone of zones(); track zone.id; let i = $index) {
+              <div class="root-zone-wrapper" [attr.data-zone-id]="zone.id" [attr.data-index]="i">
+                <ng-container *ngTemplateOutlet="zoneNestedTemplate; context: { zone: zone }"></ng-container>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Tree View Template -->
+<ng-template #zoneTreeTemplate let-zone="zone" let-depth="depth">
+  <div
+    class="zone-container"
+    [style.margin-left.px]="depth * 16"
+  >
+    <div
+      class="zone-header"
+      [style.border-left-color]="zone.color || 'var(--border-secondary)'"
+      [style.background]="highlightedZoneId() === zone.id ? 'rgba(0, 245, 255, 0.1)' : ''"
+    >
+      <span class="zone-icon" [style.background]="zone.color || 'var(--surface-3)'">
+        {{ zone.icon || '🏠' }}
+      </span>
+      <span class="zone-name">{{ zone.name }}</span>
+      <span class="zone-device-count">{{ getDevicesInZone(zone.id).length }} devices</span>
+    </div>
+
+    <div
+      class="zone-devices"
+      cdkDropList
+      [id]="'zone-' + zone.id"
+      [cdkDropListData]="getDevicesInZone(zone.id)"
+      [cdkDropListConnectedTo]="allDropListIds()"
+      (cdkDropListDropped)="onDeviceDropped($event, zone.id)"
+      (cdkDropListEntered)="onDragEnterZone(zone.id)"
+      [class.drop-target]="highlightedZoneId() === zone.id"
+      [class.has-devices]="getDevicesInZone(zone.id).length > 0"
+    >
+      @for (device of getDevicesInZone(zone.id); track device.deviceId) {
+        <div
+          class="device-card in-zone draggable"
+          cdkDrag
+          [cdkDragData]="device"
+          (cdkDragStarted)="onDragStarted(device)"
+          (cdkDragEnded)="onDragEnded()"
+        >
+          <span class="device-icon">{{ getDeviceIcon(device.deviceType) }}</span>
+          <div class="device-info">
+            <span class="device-name">{{ device.friendlyName }}</span>
+          </div>
+          <span class="drag-handle">⋮⋮</span>
+          <div class="device-placeholder" *cdkDragPlaceholder></div>
+        </div>
+      }
+
+      @if (getDevicesInZone(zone.id).length === 0) {
+        <div class="zone-drop-hint">
+          <span>Drop devices here</span>
+        </div>
+      }
+    </div>
+
+    <!-- Child zones -->
+    @if (zone.childZones?.length > 0) {
+      <div class="child-zones">
+        @for (child of zone.childZones; track child.id) {
+          <ng-container *ngTemplateOutlet="zoneTreeTemplate; context: { zone: child, depth: depth + 1 }"></ng-container>
+        }
+      </div>
+    }
+  </div>
+</ng-template>
+
+<!-- Nested Boxes View Template -->
+<ng-template #zoneNestedTemplate let-zone="zone">
+  <div
+    class="zone-box"
+    [style.border-color]="zone.color || 'var(--border-secondary)'"
+    [style.--zone-color]="zone.color || 'var(--accent-primary)'"
+    [class.drop-target]="highlightedZoneId() === zone.id"
+    [class.has-children]="zone.childZones?.length > 0"
+  >
+    <div class="zone-box-header" [style.background]="zone.color ? zone.color + '20' : ''">
+      <span class="zone-icon" [style.background]="zone.color || 'var(--surface-3)'">
+        {{ zone.icon || '🏠' }}
+      </span>
+      <span class="zone-name">{{ zone.name }}</span>
+      <span class="zone-badge">{{ getDevicesInZone(zone.id).length }}</span>
+    </div>
+
+    <div class="zone-box-content">
+      <!-- Device drop area -->
+      <div
+        class="zone-box-devices"
+        cdkDropList
+        [id]="'zone-' + zone.id"
+        [cdkDropListData]="getDevicesInZone(zone.id)"
+        [cdkDropListConnectedTo]="allDropListIds()"
+        (cdkDropListDropped)="onDeviceDropped($event, zone.id)"
+        (cdkDropListEntered)="onDragEnterZone(zone.id)"
+        [class.drop-active]="highlightedZoneId() === zone.id"
+      >
+        @for (device of getDevicesInZone(zone.id); track device.deviceId) {
+          <div
+            class="device-chip"
+            cdkDrag
+            [cdkDragData]="device"
+            (cdkDragStarted)="onDragStarted(device)"
+            (cdkDragEnded)="onDragEnded()"
+          >
+            <span class="chip-icon">{{ getDeviceIcon(device.deviceType) }}</span>
+            <span class="chip-name">{{ device.friendlyName }}</span>
+            <div class="device-placeholder" *cdkDragPlaceholder></div>
+          </div>
+        }
+
+        @if (getDevicesInZone(zone.id).length === 0 && !zone.childZones?.length) {
+          <div class="drop-hint">Drop devices here</div>
+        }
+      </div>
+
+      <!-- Nested child zones -->
+      @if (zone.childZones?.length > 0) {
+        <div class="zone-box-children">
+          @for (child of zone.childZones; track child.id) {
+            <ng-container *ngTemplateOutlet="zoneNestedTemplate; context: { zone: child }"></ng-container>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</ng-template>
+
+<!-- Saving indicator -->
+@if (saving()) {
+  <div class="saving-indicator">
+    <div class="spinner-sm"></div>
+    <span>Saving...</span>
+  </div>
+}
