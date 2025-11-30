@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,15 +12,15 @@ namespace SDHome.Lib.Services;
 public class SignalsMqttWorker : BackgroundService
 {
     private readonly ILogger<SignalsMqttWorker> _logger;
-    private readonly ISignalsService _signalsService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly MqttOptions _mqttOptions;
 
     public SignalsMqttWorker(
-        ISignalsService signalsService,
+        IServiceScopeFactory scopeFactory,
         IOptions<MqttOptions> mqttOptions,
         ILogger<SignalsMqttWorker> logger)
     {
-        _signalsService = signalsService;
+        _scopeFactory = scopeFactory;
         _mqttOptions = mqttOptions.Value;
         _logger = logger;
     }
@@ -58,7 +59,10 @@ public class SignalsMqttWorker : BackgroundService
             var topic = e.ApplicationMessage.Topic;
             var payload = e.ApplicationMessage.ConvertPayloadToString();
 
-            await _signalsService.HandleMqttMessageAsync(topic, payload, stoppingToken);
+            // Create a new scope for each message to get scoped services (EF Core DbContext)
+            using var scope = _scopeFactory.CreateScope();
+            var signalsService = scope.ServiceProvider.GetRequiredService<ISignalsService>();
+            await signalsService.HandleMqttMessageAsync(topic, payload, stoppingToken);
         };
 
         await client.ConnectAsync(options, stoppingToken);

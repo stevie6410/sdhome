@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**SDHome Signals** is a .NET-based smart home automation backend that processes IoT sensor data from MQTT messages, stores events in SQL Server, and exposes a REST API for querying signal events, sensor readings, and trigger events.
+**SDHome Signals** is a .NET-based smart home automation backend that processes IoT sensor data from MQTT messages, stores events in SQL Server using Entity Framework Core, and exposes a REST API for querying signal events, sensor readings, and trigger events.
 
 ## Architecture
 
@@ -13,7 +13,7 @@ signals/
 ├── src/
 │   ├── SDHome.Api/          # ASP.NET Core Web API (.NET 10)
 │   ├── SDHome.Lib/          # Shared library (models, services, data access)
-│   └── ClientApp/           # Frontend client application
+│   └── ClientApp/           # Frontend client application (Angular)
 ├── config/                  # Configuration files for infrastructure services
 │   ├── grafana/             # Grafana datasource configuration
 │   ├── mosquitto/           # MQTT broker configuration
@@ -26,8 +26,9 @@ signals/
 ### Technology Stack
 
 - **Runtime**: .NET 10 (Preview)
-- **Web Framework**: ASP.NET Core Minimal API with Controllers
-- **Database**: SQL Server (primary), PostgreSQL (supported)
+- **Web Framework**: ASP.NET Core with Controllers
+- **ORM**: Entity Framework Core 10 with SQL Server
+- **Database**: SQL Server
 - **Message Broker**: Eclipse Mosquitto (MQTT)
 - **Logging**: Serilog with Seq sink
 - **Metrics**: Prometheus + Grafana
@@ -37,51 +38,49 @@ signals/
 ### Core Components
 
 #### SDHome.Api
-- REST API exposing endpoints for signals, readings, and triggers
-- Controllers: `SignalsController`, `ReadingsController`, `TriggersController`
+- REST API exposing endpoints for signals, readings, triggers, and devices
+- Controllers inject `SignalsDbContext` directly (no repository pattern)
+- Health check endpoints: `/health`, `/health/ready`, `/health/live`
 - OpenAPI documentation via NSwag (auto-generates TypeScript client)
-- CORS enabled for development
 
 #### SDHome.Lib
-- **Models**: `SignalEvent`, `SensorReading`, `TriggerEvent`, `DeviceKind`, `EventCategory`
+- **Data/Entities**: EF Core entity classes (`SignalEventEntity`, `SensorReadingEntity`, `TriggerEventEntity`, `DeviceEntity`)
+- **Data/SignalsDbContext**: EF Core DbContext with Fluent API configuration
+- **Models**: Domain records (`SignalEvent`, `SensorReading`, `TriggerEvent`, `Device`)
 - **Services**: 
   - `SignalsMqttWorker` - Background service subscribing to MQTT topics
   - `SignalsService` - Core business logic for processing MQTT messages
-  - `SignalQueryService` - Query layer for signal events
   - `SignalEventProjectionService` - Projects signal events to triggers/readings
-- **Data Access**: Repository pattern with SQL Server and PostgreSQL implementations
-  - `ISignalEventsRepository`, `ISensorReadingsRepository`, `ITriggerEventsRepository`
+  - `DeviceService` - Device management and Zigbee2MQTT sync
 
 ## Key Patterns & Conventions
 
+### Data Access (EF Core Direct)
+- Controllers and services inject `SignalsDbContext` directly
+- No repository pattern - EF Core is the repository
+- Use `AsNoTracking()` for read-only queries
+- Entity classes have `ToModel()` and `FromModel()` methods for conversion
+
 ### Dependency Injection
-- Use constructor injection with primary constructors
-- Register services in `Program.cs`
-- Use `IOptions<T>` pattern for configuration
+- Use primary constructors for DI
+- Services registered as Scoped (same lifetime as DbContext)
+- `IServiceScopeFactory` used in background workers for scoped services
 
 ### Configuration
-- Configuration sections: `Signals:Mqtt`, `Signals:Postgres`, `Signals:MSSQL`, `Signals:Webhooks`
+- Configuration sections: `Signals:Mqtt`, `Signals:MSSQL`, `Signals:Webhooks`
 - Connection strings in `ConnectionStrings:DefaultConnection`
 - Environment-specific settings via `ASPNETCORE_ENVIRONMENT`
 
 ### Data Models
-- Use C# records for immutable data models
-- `SignalEvent` is the core domain entity with:
-  - Source, DeviceId, Location, Capability
-  - EventType, EventSubType, Value
-  - RawTopic, RawPayload (JsonElement)
-  - DeviceKind, EventCategory enums
+- **Entities** (EF Core): Mutable classes in `Data/Entities/`
+- **Models** (Domain): Immutable records in `Models/`
+- Entities convert to/from domain models via static methods
 
 ### API Conventions
 - Route prefix: `/api/{resource}`
 - Use `[FromQuery]` for optional parameters with defaults
 - Return `List<T>` for collection endpoints
 - Use async/await throughout
-
-### Repository Pattern
-- Interface-based repositories for testability
-- `EnsureCreatedAsync()` for database initialization
-- Support for both SQL Server and PostgreSQL
 
 ## Infrastructure Services (Docker Compose)
 
@@ -92,7 +91,6 @@ signals/
 | seq | 5341 | Structured logging server |
 | prometheus | 9090 | Metrics collection |
 | grafana | 3000 | Metrics visualization |
-| postgres | 5432 | PostgreSQL database |
 | signals | 8090 | Main API application |
 | zigbee2mqtt | 8080 | Zigbee device gateway |
 | n8n | 5678 | Workflow automation |
@@ -106,20 +104,18 @@ signals/
 ## Development Guidelines
 
 ### When Adding New Features
-1. Define models in `SDHome.Lib/Models/`
-2. Create repository interface in `SDHome.Lib/Data/`
-3. Implement SQL Server repository
-4. Add service layer in `SDHome.Lib/Services/`
-5. Expose via controller in `SDHome.Api/Controllers/`
-
-### When Working with MQTT
-- Messages arrive via `SignalsMqttWorker.ExecuteAsync()`
-- Processing happens in `ISignalsService.HandleMqttMessageAsync()`
-- Use `ISignalEventMapper` for payload parsing
+1. Define entity class in `SDHome.Lib/Data/Entities/`
+2. Add DbSet to `SignalsDbContext`
+3. Configure entity in `OnModelCreating()`
+4. Add domain model record in `SDHome.Lib/Models/`
+5. Add service logic or expose via controller
 
 ### Database Migrations
-- Tables are created via `EnsureCreatedAsync()` at startup
-- No EF Core - raw SQL with Dapper-style queries
+```bash
+cd src/SDHome.Api
+dotnet ef migrations add <MigrationName> --project ../SDHome.Lib
+dotnet ef database update
+```
 
 ### API Documentation
 - NSwag generates OpenAPI spec on debug builds
@@ -130,15 +126,15 @@ signals/
 - Use nullable reference types (`<Nullable>enable</Nullable>`)
 - Use implicit usings (`<ImplicitUsings>enable</ImplicitUsings>`)
 - Primary constructors for DI in controllers and services
-- Collection expressions: `[.. enumerable]` syntax
 - Async methods suffixed with `Async`
+- File-scoped namespaces
 
 ## Running the Project
 
 ### Local Development
 ```bash
 # Start infrastructure
-docker-compose up -d mosquitto seq prometheus grafana postgres
+docker-compose up -d mosquitto seq prometheus grafana
 
 # Run API
 cd src/SDHome.Api
@@ -152,6 +148,7 @@ docker-compose up -d
 
 ### API Endpoints
 - Swagger UI: `http://localhost:8090/swagger`
+- Health: `GET /health`
 - Signals: `GET /api/signals/logs?take=100`
 - Readings: `GET /api/readings?take=100`
 - Triggers: `GET /api/triggers?take=100`
@@ -161,7 +158,7 @@ docker-compose up -d
 | Variable | Description |
 |----------|-------------|
 | `ASPNETCORE_ENVIRONMENT` | Environment name (Docker, Development) |
+| `ConnectionStrings__DefaultConnection` | SQL Server connection string |
 | `Signals__Mqtt__Host` | MQTT broker hostname |
 | `Signals__Mqtt__Port` | MQTT broker port |
-| `Signals__Postgres__ConnectionString` | PostgreSQL connection string |
 | `Logging__SeqUrl` | Seq logging server URL |

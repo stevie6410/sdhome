@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.SpaServices.Extensions;
+using Microsoft.EntityFrameworkCore;
+using SDHome.Api.HealthChecks;
 using SDHome.Lib.Data;
 using SDHome.Lib.Mappers;
 using SDHome.Lib.Models;
@@ -30,7 +32,6 @@ builder.Services.AddOpenApiDocument(options =>
 });
 
 builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Signals:Mqtt"));
-builder.Services.Configure<PostgresOptions>(builder.Configuration.GetSection("Signals:Postgres"));
 builder.Services.Configure<MsSQLOptions>(builder.Configuration.GetSection("Signals:MSSQL"));
 builder.Services.Configure<WebhookOptions>(builder.Configuration.GetSection("Signals:Webhooks"));
 builder.Services.Configure<LoggingOptions>(builder.Configuration.GetSection("Logging"));
@@ -51,32 +52,24 @@ builder.Services.AddOpenApiDocument(options =>
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-builder.Services.AddSingleton<ISignalEventsRepository>(_ =>
-    new SqlServerSignalEventsRepository(connectionString));
-builder.Services.AddSingleton<SqlServerSignalEventsRepository>(_ =>
-    new SqlServerSignalEventsRepository(connectionString));
+// EF Core DbContext
+builder.Services.AddDbContext<SignalsDbContext>(options =>
+    options.UseSqlServer(connectionString));
 
-builder.Services.AddSingleton<ITriggerEventsRepository>(_ =>
-    new SqlServerTriggerEventsRepository(connectionString));
-
-builder.Services.AddSingleton<ISensorReadingsRepository>(_ =>
-    new SqlServerSensorReadingsRepository(connectionString));
-
-builder.Services.AddSingleton<IDeviceRepository>(_ =>
-    new SqlServerDeviceRepository(connectionString));
-
-// Mapper & query service
+// Services
 builder.Services.AddSingleton<ISignalEventMapper, SignalEventMapper>();
-builder.Services.AddScoped<ISignalQueryService, SignalQueryService>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
+builder.Services.AddScoped<ISignalEventProjectionService, SignalEventProjectionService>();
+builder.Services.AddScoped<ISignalsService, SignalsService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 
-// Projection service (SignalEvent -> triggers + readings, etc.)
-builder.Services.AddSingleton<ISignalEventProjectionService, SignalEventProjectionService>();
+// HttpClient for webhook calls
+builder.Services.AddHttpClient<ISignalsService, SignalsService>();
 
-// HttpClient + main SignalsService + MQTT worker
-builder.Services.AddHttpClient();
-builder.Services.AddSingleton<ISignalsService, SignalsService>();
+// Health Checks
+builder.Services.AddHealthChecks()
+    .AddSqlServer(connectionString!, name: "sqlserver", tags: ["db", "sql"])
+    .AddCheck<MqttHealthCheck>("mqtt", tags: ["messaging"]);
 
 // MQTT Client for DeviceService - only register if MQTT is enabled
 var mqttOptions = builder.Configuration.GetSection("Signals:Mqtt").Get<MqttOptions>();
@@ -100,23 +93,14 @@ var app = builder.Build();
 app.UseCors("DevCors");
 
 // Ensure SQL Server table/indexes exist at startup
-// (EnsureCreatedAsync should now include creation of trigger_events and sensor_readings as well)
+// Using EF Core migrations - apply pending migrations
 // Only ensure DB in normal runtime, not during NSwag or design-time builds
 if (!app.Environment.IsEnvironment("NSwag"))
 {
     using (var scope = app.Services.CreateScope())
     {
-        var signalRepo = scope.ServiceProvider.GetRequiredService<ISignalEventsRepository>() as SqlServerSignalEventsRepository;
-        if (signalRepo != null)
-        {
-            signalRepo.EnsureCreatedAsync(CancellationToken.None).GetAwaiter().GetResult();
-        }
-
-        var deviceRepo = scope.ServiceProvider.GetRequiredService<IDeviceRepository>() as SqlServerDeviceRepository;
-        if (deviceRepo != null)
-        {
-            deviceRepo.EnsureCreatedAsync().GetAwaiter().GetResult();
-        }
+        var dbContext = scope.ServiceProvider.GetRequiredService<SignalsDbContext>();
+        await dbContext.Database.MigrateAsync();
     }
 }
 
@@ -129,6 +113,37 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Health check endpoints
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration.TotalMilliseconds
+            })
+        });
+        await context.Response.WriteAsync(result);
+    }
+});
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("db")
+});
+
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false // Just checks if the app is running
+});
 
 // Serve Angular SPA
 app.UseStaticFiles();

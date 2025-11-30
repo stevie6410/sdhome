@@ -1,7 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SDHome.Lib.Data;
+using SDHome.Lib.Data.Entities;
 using SDHome.Lib.Models;
 
 namespace SDHome.Lib.Services;
@@ -20,19 +21,17 @@ public class DatabaseSeeder
     public async Task SeedAsync()
     {
         using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SignalsDbContext>();
         
-        await SeedDevicesAsync(scope.ServiceProvider);
-        await SeedSignalsAsync(scope.ServiceProvider);
-        await SeedReadingsAsync(scope.ServiceProvider);
-        await SeedTriggersAsync(scope.ServiceProvider);
+        await SeedDevicesAsync(db);
+        await SeedSignalsAsync(db);
+        await SeedReadingsAsync(db);
+        await SeedTriggersAsync(db);
     }
 
-    private async Task SeedDevicesAsync(IServiceProvider serviceProvider)
+    private async Task SeedDevicesAsync(SignalsDbContext db)
     {
-        var deviceRepo = serviceProvider.GetRequiredService<IDeviceRepository>();
-        
-        var existingDevices = await deviceRepo.GetAllAsync();
-        if (existingDevices.Any())
+        if (await db.Devices.AnyAsync())
         {
             _logger.LogInformation("Devices already seeded, skipping...");
             return;
@@ -146,17 +145,15 @@ public class DatabaseSeeder
 
         foreach (var device in devices)
         {
-            await deviceRepo.CreateAsync(device);
+            db.Devices.Add(DeviceEntity.FromModel(device));
             _logger.LogInformation("Seeded device: {DeviceId}", device.DeviceId);
         }
+        await db.SaveChangesAsync();
     }
 
-    private async Task SeedSignalsAsync(IServiceProvider serviceProvider)
+    private async Task SeedSignalsAsync(SignalsDbContext db)
     {
-        var signalRepo = serviceProvider.GetRequiredService<ISignalEventsRepository>();
-        
-        var existingSignals = await signalRepo.GetRecentAsync(1);
-        if (existingSignals.Any())
+        if (await db.SignalEvents.AnyAsync())
         {
             _logger.LogInformation("Signals already seeded, skipping...");
             return;
@@ -267,18 +264,16 @@ public class DatabaseSeeder
 
         foreach (var signal in signals)
         {
-            await signalRepo.InsertAsync(signal);
+            db.SignalEvents.Add(SignalEventEntity.FromModel(signal));
         }
+        await db.SaveChangesAsync();
 
         _logger.LogInformation("Seeded {Count} signal events", signals.Count);
     }
 
-    private async Task SeedReadingsAsync(IServiceProvider serviceProvider)
+    private async Task SeedReadingsAsync(SignalsDbContext db)
     {
-        var readingsRepo = serviceProvider.GetRequiredService<ISensorReadingsRepository>();
-        
-        var existingReadings = await readingsRepo.GetRecentAsync(1);
-        if (existingReadings.Any())
+        if (await db.SensorReadings.AnyAsync())
         {
             _logger.LogInformation("Readings already seeded, skipping...");
             return;
@@ -325,17 +320,18 @@ public class DatabaseSeeder
             }
         }
 
-        await readingsRepo.InsertManyAsync(readings);
+        foreach (var reading in readings)
+        {
+            db.SensorReadings.Add(SensorReadingEntity.FromModel(reading));
+        }
+        await db.SaveChangesAsync();
 
         _logger.LogInformation("Seeded {Count} sensor readings", readings.Count);
     }
 
-    private async Task SeedTriggersAsync(IServiceProvider serviceProvider)
+    private async Task SeedTriggersAsync(SignalsDbContext db)
     {
-        var triggerRepo = serviceProvider.GetRequiredService<ITriggerEventsRepository>();
-        
-        var existingTriggers = await triggerRepo.GetRecentAsync(1);
-        if (existingTriggers.Any())
+        if (await db.TriggerEvents.AnyAsync())
         {
             _logger.LogInformation("Triggers already seeded, skipping...");
             return;
@@ -393,8 +389,9 @@ public class DatabaseSeeder
 
         foreach (var trigger in triggers)
         {
-            await triggerRepo.InsertAsync(trigger);
+            db.TriggerEvents.Add(TriggerEventEntity.FromModel(trigger));
         }
+        await db.SaveChangesAsync();
 
         _logger.LogInformation("Seeded {Count} trigger events", triggers.Count);
     }

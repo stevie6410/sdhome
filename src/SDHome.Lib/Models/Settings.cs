@@ -8,16 +8,10 @@
         public string TopicFilter { get; set; } = "sdhome/#";
     }
 
-    public class PostgresOptions
-    {
-        public string ConnectionString { get; set; } = "";
-    }
-
     public class MsSQLOptions
     {
         public string ConnectionString { get; set; } = "";
     }
-
 
     public class WebhookOptions
     {

@@ -1,19 +1,24 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SDHome.Lib.Data;
 using SDHome.Lib.Models;
-using SDHome.Lib.Services;
 
-namespace SDHome.Api.Controllers
+namespace SDHome.Api.Controllers;
+
+[ApiController]
+[Route("/api/signals")]
+public class SignalsController(SignalsDbContext db) : ControllerBase
 {
-    [ApiController]
-    [Route("/api/signals")]
-    public class  SignalsController(ISignalQueryService queryService) : ControllerBase
+    [HttpGet("logs")]
+    public async Task<List<SignalEvent>> GetSignalLogs([FromQuery] int take = 100)
     {
-        [HttpGet("logs")]
-        public async Task<List<SignalEvent>> GetSignalLogs([FromQuery] int take = 100)
-        {
-            var res = await queryService.GetRecentAsync(take);
-            return [.. res];
-        }
+        return await db.SignalEvents
+            .AsNoTracking()
+            .Where(e => !e.DeviceId.StartsWith("bridge/"))
+            .OrderByDescending(e => e.TimestampUtc)
+            .Take(take)
+            .Select(e => e.ToModel())
+            .ToListAsync();
     }
 }
 
