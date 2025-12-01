@@ -1,0 +1,157 @@
+<div class="sensor-chart" #chartContainer>
+  @if (series.length === 0) {
+    <div class="empty-state">
+      <span>📊</span>
+      <p>No data available</p>
+    </div>
+  } @else {
+    <!-- Latest values display -->
+    @if (showLegend && latestValues().length > 0) {
+      <div class="chart-legend">
+        @for (item of latestValues(); track item.name) {
+          <div class="legend-item">
+            <span class="legend-color" [style.background]="item.color"></span>
+            <span class="legend-name">{{ item.name }}</span>
+            <span class="legend-value" [style.color]="item.color">
+              {{ item.value }}{{ item.unit }}
+            </span>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- SVG Chart -->
+    <svg
+      [attr.width]="width()"
+      [attr.height]="height"
+      class="chart-svg"
+      (mousemove)="onMouseMove($event)"
+      (mouseleave)="onMouseLeave()"
+    >
+      <defs>
+        <!-- Gradient for line glow effect -->
+        @for (path of seriesPaths(); track path.series.name; let i = $index) {
+          <linearGradient [attr.id]="'gradient-' + i" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" [attr.stop-color]="path.color" stop-opacity="0.3" />
+            <stop offset="100%" [attr.stop-color]="path.color" stop-opacity="0" />
+          </linearGradient>
+        }
+      </defs>
+
+      <g [attr.transform]="'translate(' + 50 + ',' + 20 + ')'">
+        <!-- Grid lines -->
+        @if (showGrid) {
+          <g class="grid">
+            <!-- Horizontal grid lines -->
+            @for (tick of yTicks(); track tick.value) {
+              <line
+                class="grid-line"
+                [attr.x1]="0"
+                [attr.y1]="tick.y"
+                [attr.x2]="chartWidth()"
+                [attr.y2]="tick.y"
+              />
+            }
+            <!-- Vertical grid lines -->
+            @for (tick of xTicks(); track tick.time) {
+              <line
+                class="grid-line vertical"
+                [attr.x1]="tick.x"
+                [attr.y1]="0"
+                [attr.x2]="tick.x"
+                [attr.y2]="chartHeight()"
+              />
+            }
+          </g>
+        }
+
+        <!-- Y-axis -->
+        <g class="y-axis">
+          <line [attr.x1]="0" [attr.y1]="0" [attr.x2]="0" [attr.y2]="chartHeight()" class="axis-line" />
+          @for (tick of yTicks(); track tick.value) {
+            <g [attr.transform]="'translate(0,' + tick.y + ')'">
+              <text x="-8" dy="0.32em" class="tick-label">{{ tick.label }}</text>
+            </g>
+          }
+        </g>
+
+        <!-- X-axis -->
+        <g class="x-axis" [attr.transform]="'translate(0,' + chartHeight() + ')'">
+          <line [attr.x1]="0" [attr.y1]="0" [attr.x2]="chartWidth()" [attr.y2]="0" class="axis-line" />
+          @for (tick of xTicks(); track tick.time) {
+            <g [attr.transform]="'translate(' + tick.x + ', 0)'">
+              <text y="20" class="tick-label">{{ tick.label }}</text>
+            </g>
+          }
+        </g>
+
+        <!-- Data lines -->
+        @for (path of seriesPaths(); track path.series.name; let i = $index) {
+          <g class="series">
+            <!-- Area fill (optional glow effect) -->
+            @if (path.path && path.data && path.data.length > 1) {
+              <path
+                class="area-fill"
+                [attr.d]="path.path + ' L ' + chartWidth() + ' ' + chartHeight() + ' L 0 ' + chartHeight() + ' Z'"
+                [attr.fill]="'url(#gradient-' + i + ')'"
+              />
+            }
+            <!-- Main line -->
+            <path
+              class="data-line"
+              [attr.d]="path.path"
+              [attr.stroke]="path.color"
+              fill="none"
+            />
+            <!-- Data points -->
+            @if (path.data) {
+              @for (point of path.data; track point.timestamp) {
+                <circle
+                  class="data-point"
+                  [attr.cx]="xScale()(point.timestamp)"
+                  [attr.cy]="yScale()(point.value)"
+                  r="3"
+                  [attr.fill]="path.color"
+                />
+              }
+            }
+          </g>
+        }
+
+        <!-- Hover indicator -->
+        @if (hoveredPoint(); as hp) {
+          <g class="hover-indicator">
+            <circle
+              [attr.cx]="xScale()(hp.point.timestamp)"
+              [attr.cy]="yScale()(hp.point.value)"
+              r="6"
+              class="hover-ring"
+            />
+            <line
+              class="hover-line vertical"
+              [attr.x1]="xScale()(hp.point.timestamp)"
+              [attr.y1]="0"
+              [attr.x2]="xScale()(hp.point.timestamp)"
+              [attr.y2]="chartHeight()"
+            />
+          </g>
+        }
+      </g>
+    </svg>
+
+    <!-- Tooltip -->
+    @if (hoveredPoint(); as hp) {
+      <div
+        class="chart-tooltip"
+        [style.left.px]="hp.x"
+        [style.top.px]="hp.y - 60"
+      >
+        <div class="tooltip-time">{{ formatTooltipTime(hp.point.timestamp) }}</div>
+        <div class="tooltip-value">
+          <span class="tooltip-name">{{ hp.series.name }}:</span>
+          <span class="tooltip-number">{{ hp.point.value | number:'1.1-1' }}{{ hp.series.unit || '' }}</span>
+        </div>
+      </div>
+    }
+  }
+</div>

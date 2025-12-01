@@ -32,6 +32,7 @@ export class LayoutComponent implements OnInit {
     { label: 'Triggers', icon: '🔔', route: '/triggers' },
     { label: 'Devices', icon: '📡', route: '/devices' },
     { label: 'Zones', icon: '🏢', route: '/zones' },
+    { label: 'Automations', icon: '🤖', route: '/automations' },
   ];
 
   // Computed connection status

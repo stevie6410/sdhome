@@ -17,6 +17,906 @@ export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL');
 @Injectable({
     providedIn: 'root'
 })
+export class AutomationsApiService {
+    private http: HttpClient;
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(@Inject(HttpClient) http: HttpClient, @Optional() @Inject(API_BASE_URL) baseUrl?: string) {
+        this.http = http;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    getAutomations(): Observable<AutomationSummary[]> {
+        let url_ = this.baseUrl + "/api/automations";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetAutomations(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetAutomations(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<AutomationSummary[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<AutomationSummary[]>;
+        }));
+    }
+
+    protected processGetAutomations(response: HttpResponseBase): Observable<AutomationSummary[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(AutomationSummary.fromJS(item));
+            }
+            else {
+                result200 = null as any;
+            }
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    createAutomation(request: CreateAutomationRequest): Observable<AutomationRule> {
+        let url_ = this.baseUrl + "/api/automations";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_ : any = {
+            body: content_,
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processCreateAutomation(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processCreateAutomation(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<AutomationRule>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<AutomationRule>;
+        }));
+    }
+
+    protected processCreateAutomation(response: HttpResponseBase): Observable<AutomationRule> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = AutomationRule.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    getStats(): Observable<AutomationStats> {
+        let url_ = this.baseUrl + "/api/automations/stats";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetStats(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetStats(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<AutomationStats>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<AutomationStats>;
+        }));
+    }
+
+    protected processGetStats(response: HttpResponseBase): Observable<AutomationStats> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = AutomationStats.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    getAutomation(id: string): Observable<AutomationRule> {
+        let url_ = this.baseUrl + "/api/automations/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetAutomation(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetAutomation(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<AutomationRule>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<AutomationRule>;
+        }));
+    }
+
+    protected processGetAutomation(response: HttpResponseBase): Observable<AutomationRule> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = AutomationRule.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    updateAutomation(id: string, request: UpdateAutomationRequest): Observable<AutomationRule> {
+        let url_ = this.baseUrl + "/api/automations/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_ : any = {
+            body: content_,
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("put", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processUpdateAutomation(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processUpdateAutomation(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<AutomationRule>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<AutomationRule>;
+        }));
+    }
+
+    protected processUpdateAutomation(response: HttpResponseBase): Observable<AutomationRule> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = AutomationRule.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    deleteAutomation(id: string): Observable<FileResponse> {
+        let url_ = this.baseUrl + "/api/automations/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/octet-stream"
+            })
+        };
+
+        return this.http.request("delete", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processDeleteAutomation(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processDeleteAutomation(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<FileResponse>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<FileResponse>;
+        }));
+    }
+
+    protected processDeleteAutomation(response: HttpResponseBase): Observable<FileResponse> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200 || status === 206) {
+            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
+            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
+            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
+            if (fileName) {
+                fileName = decodeURIComponent(fileName);
+            } else {
+                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
+                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
+            }
+            return _observableOf({ fileName: fileName, data: responseBlob as any, status: status, headers: _headers });
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    toggleAutomation(id: string, enabled: boolean | undefined): Observable<AutomationRule> {
+        let url_ = this.baseUrl + "/api/automations/{id}/toggle?";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (enabled === null)
+            throw new globalThis.Error("The parameter 'enabled' cannot be null.");
+        else if (enabled !== undefined)
+            url_ += "enabled=" + encodeURIComponent("" + enabled) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("patch", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processToggleAutomation(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processToggleAutomation(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<AutomationRule>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<AutomationRule>;
+        }));
+    }
+
+    protected processToggleAutomation(response: HttpResponseBase): Observable<AutomationRule> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = AutomationRule.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    triggerAutomation(id: string): Observable<FileResponse> {
+        let url_ = this.baseUrl + "/api/automations/{id}/trigger";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/octet-stream"
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processTriggerAutomation(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processTriggerAutomation(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<FileResponse>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<FileResponse>;
+        }));
+    }
+
+    protected processTriggerAutomation(response: HttpResponseBase): Observable<FileResponse> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200 || status === 206) {
+            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
+            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
+            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
+            if (fileName) {
+                fileName = decodeURIComponent(fileName);
+            } else {
+                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
+                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
+            }
+            return _observableOf({ fileName: fileName, data: responseBlob as any, status: status, headers: _headers });
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    getExecutionLogs(automationId: string | null | undefined, take: number | undefined): Observable<AutomationExecutionLog[]> {
+        let url_ = this.baseUrl + "/api/automations/logs?";
+        if (automationId !== undefined && automationId !== null)
+            url_ += "automationId=" + encodeURIComponent("" + automationId) + "&";
+        if (take === null)
+            throw new globalThis.Error("The parameter 'take' cannot be null.");
+        else if (take !== undefined)
+            url_ += "take=" + encodeURIComponent("" + take) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetExecutionLogs(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetExecutionLogs(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<AutomationExecutionLog[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<AutomationExecutionLog[]>;
+        }));
+    }
+
+    protected processGetExecutionLogs(response: HttpResponseBase): Observable<AutomationExecutionLog[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(AutomationExecutionLog.fromJS(item));
+            }
+            else {
+                result200 = null as any;
+            }
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    getAutomationLogs(id: string, take: number | undefined): Observable<AutomationExecutionLog[]> {
+        let url_ = this.baseUrl + "/api/automations/{id}/logs?";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (take === null)
+            throw new globalThis.Error("The parameter 'take' cannot be null.");
+        else if (take !== undefined)
+            url_ += "take=" + encodeURIComponent("" + take) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetAutomationLogs(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetAutomationLogs(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<AutomationExecutionLog[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<AutomationExecutionLog[]>;
+        }));
+    }
+
+    protected processGetAutomationLogs(response: HttpResponseBase): Observable<AutomationExecutionLog[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(AutomationExecutionLog.fromJS(item));
+            }
+            else {
+                result200 = null as any;
+            }
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+}
+
+@Injectable({
+    providedIn: 'root'
+})
+export class ScenesApiService {
+    private http: HttpClient;
+    private baseUrl: string;
+    protected jsonParseReviver: ((key: string, value: any) => any) | undefined = undefined;
+
+    constructor(@Inject(HttpClient) http: HttpClient, @Optional() @Inject(API_BASE_URL) baseUrl?: string) {
+        this.http = http;
+        this.baseUrl = baseUrl ?? "";
+    }
+
+    getScenes(): Observable<Scene[]> {
+        let url_ = this.baseUrl + "/api/scenes";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetScenes(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetScenes(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<Scene[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<Scene[]>;
+        }));
+    }
+
+    protected processGetScenes(response: HttpResponseBase): Observable<Scene[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(Scene.fromJS(item));
+            }
+            else {
+                result200 = null as any;
+            }
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    createScene(request: CreateSceneRequest): Observable<Scene> {
+        let url_ = this.baseUrl + "/api/scenes";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_ : any = {
+            body: content_,
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processCreateScene(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processCreateScene(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<Scene>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<Scene>;
+        }));
+    }
+
+    protected processCreateScene(response: HttpResponseBase): Observable<Scene> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = Scene.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    getScene(id: string): Observable<Scene> {
+        let url_ = this.baseUrl + "/api/scenes/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetScene(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetScene(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<Scene>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<Scene>;
+        }));
+    }
+
+    protected processGetScene(response: HttpResponseBase): Observable<Scene> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = Scene.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    updateScene(id: string, request: UpdateSceneRequest): Observable<Scene> {
+        let url_ = this.baseUrl + "/api/scenes/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(request);
+
+        let options_ : any = {
+            body: content_,
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("put", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processUpdateScene(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processUpdateScene(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<Scene>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<Scene>;
+        }));
+    }
+
+    protected processUpdateScene(response: HttpResponseBase): Observable<Scene> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = Scene.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    deleteScene(id: string): Observable<FileResponse> {
+        let url_ = this.baseUrl + "/api/scenes/{id}";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/octet-stream"
+            })
+        };
+
+        return this.http.request("delete", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processDeleteScene(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processDeleteScene(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<FileResponse>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<FileResponse>;
+        }));
+    }
+
+    protected processDeleteScene(response: HttpResponseBase): Observable<FileResponse> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200 || status === 206) {
+            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
+            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
+            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
+            if (fileName) {
+                fileName = decodeURIComponent(fileName);
+            } else {
+                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
+                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
+            }
+            return _observableOf({ fileName: fileName, data: responseBlob as any, status: status, headers: _headers });
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    activateScene(id: string): Observable<FileResponse> {
+        let url_ = this.baseUrl + "/api/scenes/{id}/activate";
+        if (id === undefined || id === null)
+            throw new globalThis.Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/octet-stream"
+            })
+        };
+
+        return this.http.request("post", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processActivateScene(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processActivateScene(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<FileResponse>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<FileResponse>;
+        }));
+    }
+
+    protected processActivateScene(response: HttpResponseBase): Observable<FileResponse> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200 || status === 206) {
+            const contentDisposition = response.headers ? response.headers.get("content-disposition") : undefined;
+            let fileNameMatch = contentDisposition ? /filename\*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/g.exec(contentDisposition) : undefined;
+            let fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[3] || fileNameMatch[2] : undefined;
+            if (fileName) {
+                fileName = decodeURIComponent(fileName);
+            } else {
+                fileNameMatch = contentDisposition ? /filename="?([^"]*?)"?(;|$)/g.exec(contentDisposition) : undefined;
+                fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
+            }
+            return _observableOf({ fileName: fileName, data: responseBlob as any, status: status, headers: _headers });
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+}
+
+@Injectable({
+    providedIn: 'root'
+})
 export class DevicesApiService {
     private http: HttpClient;
     private baseUrl: string;
@@ -984,7 +1884,71 @@ export class ReadingsApiService {
         return _observableOf(null as any);
     }
 
-    getReadingsForDeviceAndMetric(deviceId: string, metric: string, take: number | undefined): Observable<SensorReading[]> {
+    getReadingsForDevice(deviceId: string, take: number | undefined, hours: number | null | undefined): Observable<SensorReading[]> {
+        let url_ = this.baseUrl + "/api/readings/{deviceId}?";
+        if (deviceId === undefined || deviceId === null)
+            throw new globalThis.Error("The parameter 'deviceId' must be defined.");
+        url_ = url_.replace("{deviceId}", encodeURIComponent("" + deviceId));
+        if (take === null)
+            throw new globalThis.Error("The parameter 'take' cannot be null.");
+        else if (take !== undefined)
+            url_ += "take=" + encodeURIComponent("" + take) + "&";
+        if (hours !== undefined && hours !== null)
+            url_ += "hours=" + encodeURIComponent("" + hours) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetReadingsForDevice(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetReadingsForDevice(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<SensorReading[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<SensorReading[]>;
+        }));
+    }
+
+    protected processGetReadingsForDevice(response: HttpResponseBase): Observable<SensorReading[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(SensorReading.fromJS(item));
+            }
+            else {
+                result200 = null as any;
+            }
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    getReadingsForDeviceAndMetric(deviceId: string, metric: string, take: number | undefined, hours: number | null | undefined): Observable<SensorReading[]> {
         let url_ = this.baseUrl + "/api/readings/{deviceId}/{metric}?";
         if (deviceId === undefined || deviceId === null)
             throw new globalThis.Error("The parameter 'deviceId' must be defined.");
@@ -996,6 +1960,8 @@ export class ReadingsApiService {
             throw new globalThis.Error("The parameter 'take' cannot be null.");
         else if (take !== undefined)
             url_ += "take=" + encodeURIComponent("" + take) + "&";
+        if (hours !== undefined && hours !== null)
+            url_ += "hours=" + encodeURIComponent("" + hours) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_ : any = {
@@ -1841,6 +2807,1338 @@ export class ZonesApiService {
         }
         return _observableOf(null as any);
     }
+}
+
+export class AutomationSummary implements IAutomationSummary {
+    id?: string;
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    isEnabled?: boolean;
+    triggerCount?: number;
+    conditionCount?: number;
+    actionCount?: number;
+    lastTriggeredAt?: Date | undefined;
+    executionCount?: number;
+    createdAt?: Date;
+
+    constructor(data?: IAutomationSummary) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.name = _data["name"];
+            this.description = _data["description"];
+            this.icon = _data["icon"];
+            this.color = _data["color"];
+            this.isEnabled = _data["isEnabled"];
+            this.triggerCount = _data["triggerCount"];
+            this.conditionCount = _data["conditionCount"];
+            this.actionCount = _data["actionCount"];
+            this.lastTriggeredAt = _data["lastTriggeredAt"] ? new Date(_data["lastTriggeredAt"].toString()) : undefined as any;
+            this.executionCount = _data["executionCount"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): AutomationSummary {
+        data = typeof data === 'object' ? data : {};
+        let result = new AutomationSummary();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["name"] = this.name;
+        data["description"] = this.description;
+        data["icon"] = this.icon;
+        data["color"] = this.color;
+        data["isEnabled"] = this.isEnabled;
+        data["triggerCount"] = this.triggerCount;
+        data["conditionCount"] = this.conditionCount;
+        data["actionCount"] = this.actionCount;
+        data["lastTriggeredAt"] = this.lastTriggeredAt ? this.lastTriggeredAt.toISOString() : undefined as any;
+        data["executionCount"] = this.executionCount;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+export interface IAutomationSummary {
+    id?: string;
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    isEnabled?: boolean;
+    triggerCount?: number;
+    conditionCount?: number;
+    actionCount?: number;
+    lastTriggeredAt?: Date | undefined;
+    executionCount?: number;
+    createdAt?: Date;
+}
+
+export class AutomationStats implements IAutomationStats {
+    totalAutomations?: number;
+    enabledAutomations?: number;
+    disabledAutomations?: number;
+    totalExecutionsToday?: number;
+    successfulExecutionsToday?: number;
+    failedExecutionsToday?: number;
+
+    constructor(data?: IAutomationStats) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.totalAutomations = _data["totalAutomations"];
+            this.enabledAutomations = _data["enabledAutomations"];
+            this.disabledAutomations = _data["disabledAutomations"];
+            this.totalExecutionsToday = _data["totalExecutionsToday"];
+            this.successfulExecutionsToday = _data["successfulExecutionsToday"];
+            this.failedExecutionsToday = _data["failedExecutionsToday"];
+        }
+    }
+
+    static fromJS(data: any): AutomationStats {
+        data = typeof data === 'object' ? data : {};
+        let result = new AutomationStats();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["totalAutomations"] = this.totalAutomations;
+        data["enabledAutomations"] = this.enabledAutomations;
+        data["disabledAutomations"] = this.disabledAutomations;
+        data["totalExecutionsToday"] = this.totalExecutionsToday;
+        data["successfulExecutionsToday"] = this.successfulExecutionsToday;
+        data["failedExecutionsToday"] = this.failedExecutionsToday;
+        return data;
+    }
+}
+
+export interface IAutomationStats {
+    totalAutomations?: number;
+    enabledAutomations?: number;
+    disabledAutomations?: number;
+    totalExecutionsToday?: number;
+    successfulExecutionsToday?: number;
+    failedExecutionsToday?: number;
+}
+
+export class AutomationRule implements IAutomationRule {
+    id?: string;
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    isEnabled?: boolean;
+    triggerMode?: TriggerMode;
+    conditionMode?: ConditionMode;
+    cooldownSeconds?: number;
+    lastTriggeredAt?: Date | undefined;
+    executionCount?: number;
+    createdAt?: Date;
+    updatedAt?: Date;
+    triggers?: AutomationTrigger[];
+    conditions?: AutomationCondition[];
+    actions?: AutomationAction[];
+
+    constructor(data?: IAutomationRule) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.name = _data["name"];
+            this.description = _data["description"];
+            this.icon = _data["icon"];
+            this.color = _data["color"];
+            this.isEnabled = _data["isEnabled"];
+            this.triggerMode = _data["triggerMode"];
+            this.conditionMode = _data["conditionMode"];
+            this.cooldownSeconds = _data["cooldownSeconds"];
+            this.lastTriggeredAt = _data["lastTriggeredAt"] ? new Date(_data["lastTriggeredAt"].toString()) : undefined as any;
+            this.executionCount = _data["executionCount"];
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+            if (Array.isArray(_data["triggers"])) {
+                this.triggers = [] as any;
+                for (let item of _data["triggers"])
+                    this.triggers!.push(AutomationTrigger.fromJS(item));
+            }
+            if (Array.isArray(_data["conditions"])) {
+                this.conditions = [] as any;
+                for (let item of _data["conditions"])
+                    this.conditions!.push(AutomationCondition.fromJS(item));
+            }
+            if (Array.isArray(_data["actions"])) {
+                this.actions = [] as any;
+                for (let item of _data["actions"])
+                    this.actions!.push(AutomationAction.fromJS(item));
+            }
+        }
+    }
+
+    static fromJS(data: any): AutomationRule {
+        data = typeof data === 'object' ? data : {};
+        let result = new AutomationRule();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["name"] = this.name;
+        data["description"] = this.description;
+        data["icon"] = this.icon;
+        data["color"] = this.color;
+        data["isEnabled"] = this.isEnabled;
+        data["triggerMode"] = this.triggerMode;
+        data["conditionMode"] = this.conditionMode;
+        data["cooldownSeconds"] = this.cooldownSeconds;
+        data["lastTriggeredAt"] = this.lastTriggeredAt ? this.lastTriggeredAt.toISOString() : undefined as any;
+        data["executionCount"] = this.executionCount;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        if (Array.isArray(this.triggers)) {
+            data["triggers"] = [];
+            for (let item of this.triggers)
+                data["triggers"].push(item ? item.toJSON() : undefined as any);
+        }
+        if (Array.isArray(this.conditions)) {
+            data["conditions"] = [];
+            for (let item of this.conditions)
+                data["conditions"].push(item ? item.toJSON() : undefined as any);
+        }
+        if (Array.isArray(this.actions)) {
+            data["actions"] = [];
+            for (let item of this.actions)
+                data["actions"].push(item ? item.toJSON() : undefined as any);
+        }
+        return data;
+    }
+}
+
+export interface IAutomationRule {
+    id?: string;
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    isEnabled?: boolean;
+    triggerMode?: TriggerMode;
+    conditionMode?: ConditionMode;
+    cooldownSeconds?: number;
+    lastTriggeredAt?: Date | undefined;
+    executionCount?: number;
+    createdAt?: Date;
+    updatedAt?: Date;
+    triggers?: AutomationTrigger[];
+    conditions?: AutomationCondition[];
+    actions?: AutomationAction[];
+}
+
+export enum TriggerMode {
+    Any = 0,
+    All = 1,
+}
+
+export enum ConditionMode {
+    All = 0,
+    Any = 1,
+}
+
+export class AutomationTrigger implements IAutomationTrigger {
+    id?: string;
+    automationRuleId?: string;
+    triggerType?: TriggerType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    operator?: ComparisonOperator | undefined;
+    value?: any | undefined;
+    timeExpression?: string | undefined;
+    sunEvent?: string | undefined;
+    offsetMinutes?: number | undefined;
+    sortOrder?: number;
+
+    constructor(data?: IAutomationTrigger) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.automationRuleId = _data["automationRuleId"];
+            this.triggerType = _data["triggerType"];
+            this.deviceId = _data["deviceId"];
+            this.property = _data["property"];
+            this.operator = _data["operator"];
+            this.value = _data["value"];
+            this.timeExpression = _data["timeExpression"];
+            this.sunEvent = _data["sunEvent"];
+            this.offsetMinutes = _data["offsetMinutes"];
+            this.sortOrder = _data["sortOrder"];
+        }
+    }
+
+    static fromJS(data: any): AutomationTrigger {
+        data = typeof data === 'object' ? data : {};
+        let result = new AutomationTrigger();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["automationRuleId"] = this.automationRuleId;
+        data["triggerType"] = this.triggerType;
+        data["deviceId"] = this.deviceId;
+        data["property"] = this.property;
+        data["operator"] = this.operator;
+        data["value"] = this.value;
+        data["timeExpression"] = this.timeExpression;
+        data["sunEvent"] = this.sunEvent;
+        data["offsetMinutes"] = this.offsetMinutes;
+        data["sortOrder"] = this.sortOrder;
+        return data;
+    }
+}
+
+export interface IAutomationTrigger {
+    id?: string;
+    automationRuleId?: string;
+    triggerType?: TriggerType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    operator?: ComparisonOperator | undefined;
+    value?: any | undefined;
+    timeExpression?: string | undefined;
+    sunEvent?: string | undefined;
+    offsetMinutes?: number | undefined;
+    sortOrder?: number;
+}
+
+export enum TriggerType {
+    DeviceState = 0,
+    Time = 1,
+    Sunrise = 2,
+    Sunset = 3,
+    SensorThreshold = 4,
+    Manual = 5,
+}
+
+export enum ComparisonOperator {
+    Equals = 0,
+    NotEquals = 1,
+    GreaterThan = 2,
+    GreaterThanOrEqual = 3,
+    LessThan = 4,
+    LessThanOrEqual = 5,
+    Between = 6,
+    Contains = 7,
+    StartsWith = 8,
+    EndsWith = 9,
+    ChangesTo = 10,
+    ChangesFrom = 11,
+    AnyChange = 12,
+}
+
+export class AutomationCondition implements IAutomationCondition {
+    id?: string;
+    automationRuleId?: string;
+    conditionType?: ConditionType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    operator?: ComparisonOperator | undefined;
+    value?: any | undefined;
+    value2?: any | undefined;
+    timeStart?: string | undefined;
+    timeEnd?: string | undefined;
+    daysOfWeek?: DayOfWeek[] | undefined;
+    sortOrder?: number;
+
+    constructor(data?: IAutomationCondition) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.automationRuleId = _data["automationRuleId"];
+            this.conditionType = _data["conditionType"];
+            this.deviceId = _data["deviceId"];
+            this.property = _data["property"];
+            this.operator = _data["operator"];
+            this.value = _data["value"];
+            this.value2 = _data["value2"];
+            this.timeStart = _data["timeStart"];
+            this.timeEnd = _data["timeEnd"];
+            if (Array.isArray(_data["daysOfWeek"])) {
+                this.daysOfWeek = [] as any;
+                for (let item of _data["daysOfWeek"])
+                    this.daysOfWeek!.push(item);
+            }
+            this.sortOrder = _data["sortOrder"];
+        }
+    }
+
+    static fromJS(data: any): AutomationCondition {
+        data = typeof data === 'object' ? data : {};
+        let result = new AutomationCondition();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["automationRuleId"] = this.automationRuleId;
+        data["conditionType"] = this.conditionType;
+        data["deviceId"] = this.deviceId;
+        data["property"] = this.property;
+        data["operator"] = this.operator;
+        data["value"] = this.value;
+        data["value2"] = this.value2;
+        data["timeStart"] = this.timeStart;
+        data["timeEnd"] = this.timeEnd;
+        if (Array.isArray(this.daysOfWeek)) {
+            data["daysOfWeek"] = [];
+            for (let item of this.daysOfWeek)
+                data["daysOfWeek"].push(item);
+        }
+        data["sortOrder"] = this.sortOrder;
+        return data;
+    }
+}
+
+export interface IAutomationCondition {
+    id?: string;
+    automationRuleId?: string;
+    conditionType?: ConditionType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    operator?: ComparisonOperator | undefined;
+    value?: any | undefined;
+    value2?: any | undefined;
+    timeStart?: string | undefined;
+    timeEnd?: string | undefined;
+    daysOfWeek?: DayOfWeek[] | undefined;
+    sortOrder?: number;
+}
+
+export enum ConditionType {
+    DeviceState = 0,
+    TimeRange = 1,
+    DayOfWeek = 2,
+    SunPosition = 3,
+    And = 4,
+    Or = 5,
+}
+
+export enum DayOfWeek {
+    Sunday = 0,
+    Monday = 1,
+    Tuesday = 2,
+    Wednesday = 3,
+    Thursday = 4,
+    Friday = 5,
+    Saturday = 6,
+}
+
+export class AutomationAction implements IAutomationAction {
+    id?: string;
+    automationRuleId?: string;
+    actionType?: ActionType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    value?: any | undefined;
+    delaySeconds?: number | undefined;
+    webhookUrl?: string | undefined;
+    webhookMethod?: string | undefined;
+    webhookBody?: string | undefined;
+    notificationTitle?: string | undefined;
+    notificationMessage?: string | undefined;
+    sceneId?: string | undefined;
+    sortOrder?: number;
+
+    constructor(data?: IAutomationAction) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.automationRuleId = _data["automationRuleId"];
+            this.actionType = _data["actionType"];
+            this.deviceId = _data["deviceId"];
+            this.property = _data["property"];
+            this.value = _data["value"];
+            this.delaySeconds = _data["delaySeconds"];
+            this.webhookUrl = _data["webhookUrl"];
+            this.webhookMethod = _data["webhookMethod"];
+            this.webhookBody = _data["webhookBody"];
+            this.notificationTitle = _data["notificationTitle"];
+            this.notificationMessage = _data["notificationMessage"];
+            this.sceneId = _data["sceneId"];
+            this.sortOrder = _data["sortOrder"];
+        }
+    }
+
+    static fromJS(data: any): AutomationAction {
+        data = typeof data === 'object' ? data : {};
+        let result = new AutomationAction();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["automationRuleId"] = this.automationRuleId;
+        data["actionType"] = this.actionType;
+        data["deviceId"] = this.deviceId;
+        data["property"] = this.property;
+        data["value"] = this.value;
+        data["delaySeconds"] = this.delaySeconds;
+        data["webhookUrl"] = this.webhookUrl;
+        data["webhookMethod"] = this.webhookMethod;
+        data["webhookBody"] = this.webhookBody;
+        data["notificationTitle"] = this.notificationTitle;
+        data["notificationMessage"] = this.notificationMessage;
+        data["sceneId"] = this.sceneId;
+        data["sortOrder"] = this.sortOrder;
+        return data;
+    }
+}
+
+export interface IAutomationAction {
+    id?: string;
+    automationRuleId?: string;
+    actionType?: ActionType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    value?: any | undefined;
+    delaySeconds?: number | undefined;
+    webhookUrl?: string | undefined;
+    webhookMethod?: string | undefined;
+    webhookBody?: string | undefined;
+    notificationTitle?: string | undefined;
+    notificationMessage?: string | undefined;
+    sceneId?: string | undefined;
+    sortOrder?: number;
+}
+
+export enum ActionType {
+    SetDeviceState = 0,
+    ToggleDevice = 1,
+    Delay = 2,
+    Webhook = 3,
+    Notification = 4,
+    ActivateScene = 5,
+    RunAutomation = 6,
+}
+
+export class CreateAutomationRequest implements ICreateAutomationRequest {
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    isEnabled?: boolean;
+    triggerMode?: TriggerMode;
+    conditionMode?: ConditionMode;
+    cooldownSeconds?: number;
+    triggers?: CreateTriggerRequest[];
+    conditions?: CreateConditionRequest[];
+    actions?: CreateActionRequest[];
+
+    constructor(data?: ICreateAutomationRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.name = _data["name"];
+            this.description = _data["description"];
+            this.icon = _data["icon"];
+            this.color = _data["color"];
+            this.isEnabled = _data["isEnabled"];
+            this.triggerMode = _data["triggerMode"];
+            this.conditionMode = _data["conditionMode"];
+            this.cooldownSeconds = _data["cooldownSeconds"];
+            if (Array.isArray(_data["triggers"])) {
+                this.triggers = [] as any;
+                for (let item of _data["triggers"])
+                    this.triggers!.push(CreateTriggerRequest.fromJS(item));
+            }
+            if (Array.isArray(_data["conditions"])) {
+                this.conditions = [] as any;
+                for (let item of _data["conditions"])
+                    this.conditions!.push(CreateConditionRequest.fromJS(item));
+            }
+            if (Array.isArray(_data["actions"])) {
+                this.actions = [] as any;
+                for (let item of _data["actions"])
+                    this.actions!.push(CreateActionRequest.fromJS(item));
+            }
+        }
+    }
+
+    static fromJS(data: any): CreateAutomationRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new CreateAutomationRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["name"] = this.name;
+        data["description"] = this.description;
+        data["icon"] = this.icon;
+        data["color"] = this.color;
+        data["isEnabled"] = this.isEnabled;
+        data["triggerMode"] = this.triggerMode;
+        data["conditionMode"] = this.conditionMode;
+        data["cooldownSeconds"] = this.cooldownSeconds;
+        if (Array.isArray(this.triggers)) {
+            data["triggers"] = [];
+            for (let item of this.triggers)
+                data["triggers"].push(item ? item.toJSON() : undefined as any);
+        }
+        if (Array.isArray(this.conditions)) {
+            data["conditions"] = [];
+            for (let item of this.conditions)
+                data["conditions"].push(item ? item.toJSON() : undefined as any);
+        }
+        if (Array.isArray(this.actions)) {
+            data["actions"] = [];
+            for (let item of this.actions)
+                data["actions"].push(item ? item.toJSON() : undefined as any);
+        }
+        return data;
+    }
+}
+
+export interface ICreateAutomationRequest {
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    isEnabled?: boolean;
+    triggerMode?: TriggerMode;
+    conditionMode?: ConditionMode;
+    cooldownSeconds?: number;
+    triggers?: CreateTriggerRequest[];
+    conditions?: CreateConditionRequest[];
+    actions?: CreateActionRequest[];
+}
+
+export class CreateTriggerRequest implements ICreateTriggerRequest {
+    triggerType?: TriggerType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    operator?: ComparisonOperator | undefined;
+    value?: any | undefined;
+    timeExpression?: string | undefined;
+    sunEvent?: string | undefined;
+    offsetMinutes?: number | undefined;
+    sortOrder?: number;
+
+    constructor(data?: ICreateTriggerRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.triggerType = _data["triggerType"];
+            this.deviceId = _data["deviceId"];
+            this.property = _data["property"];
+            this.operator = _data["operator"];
+            this.value = _data["value"];
+            this.timeExpression = _data["timeExpression"];
+            this.sunEvent = _data["sunEvent"];
+            this.offsetMinutes = _data["offsetMinutes"];
+            this.sortOrder = _data["sortOrder"];
+        }
+    }
+
+    static fromJS(data: any): CreateTriggerRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new CreateTriggerRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["triggerType"] = this.triggerType;
+        data["deviceId"] = this.deviceId;
+        data["property"] = this.property;
+        data["operator"] = this.operator;
+        data["value"] = this.value;
+        data["timeExpression"] = this.timeExpression;
+        data["sunEvent"] = this.sunEvent;
+        data["offsetMinutes"] = this.offsetMinutes;
+        data["sortOrder"] = this.sortOrder;
+        return data;
+    }
+}
+
+export interface ICreateTriggerRequest {
+    triggerType?: TriggerType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    operator?: ComparisonOperator | undefined;
+    value?: any | undefined;
+    timeExpression?: string | undefined;
+    sunEvent?: string | undefined;
+    offsetMinutes?: number | undefined;
+    sortOrder?: number;
+}
+
+export class CreateConditionRequest implements ICreateConditionRequest {
+    conditionType?: ConditionType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    operator?: ComparisonOperator | undefined;
+    value?: any | undefined;
+    value2?: any | undefined;
+    timeStart?: string | undefined;
+    timeEnd?: string | undefined;
+    daysOfWeek?: DayOfWeek[] | undefined;
+    sortOrder?: number;
+
+    constructor(data?: ICreateConditionRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.conditionType = _data["conditionType"];
+            this.deviceId = _data["deviceId"];
+            this.property = _data["property"];
+            this.operator = _data["operator"];
+            this.value = _data["value"];
+            this.value2 = _data["value2"];
+            this.timeStart = _data["timeStart"];
+            this.timeEnd = _data["timeEnd"];
+            if (Array.isArray(_data["daysOfWeek"])) {
+                this.daysOfWeek = [] as any;
+                for (let item of _data["daysOfWeek"])
+                    this.daysOfWeek!.push(item);
+            }
+            this.sortOrder = _data["sortOrder"];
+        }
+    }
+
+    static fromJS(data: any): CreateConditionRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new CreateConditionRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["conditionType"] = this.conditionType;
+        data["deviceId"] = this.deviceId;
+        data["property"] = this.property;
+        data["operator"] = this.operator;
+        data["value"] = this.value;
+        data["value2"] = this.value2;
+        data["timeStart"] = this.timeStart;
+        data["timeEnd"] = this.timeEnd;
+        if (Array.isArray(this.daysOfWeek)) {
+            data["daysOfWeek"] = [];
+            for (let item of this.daysOfWeek)
+                data["daysOfWeek"].push(item);
+        }
+        data["sortOrder"] = this.sortOrder;
+        return data;
+    }
+}
+
+export interface ICreateConditionRequest {
+    conditionType?: ConditionType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    operator?: ComparisonOperator | undefined;
+    value?: any | undefined;
+    value2?: any | undefined;
+    timeStart?: string | undefined;
+    timeEnd?: string | undefined;
+    daysOfWeek?: DayOfWeek[] | undefined;
+    sortOrder?: number;
+}
+
+export class CreateActionRequest implements ICreateActionRequest {
+    actionType?: ActionType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    value?: any | undefined;
+    delaySeconds?: number | undefined;
+    webhookUrl?: string | undefined;
+    webhookMethod?: string | undefined;
+    webhookBody?: string | undefined;
+    notificationTitle?: string | undefined;
+    notificationMessage?: string | undefined;
+    sceneId?: string | undefined;
+    sortOrder?: number;
+
+    constructor(data?: ICreateActionRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.actionType = _data["actionType"];
+            this.deviceId = _data["deviceId"];
+            this.property = _data["property"];
+            this.value = _data["value"];
+            this.delaySeconds = _data["delaySeconds"];
+            this.webhookUrl = _data["webhookUrl"];
+            this.webhookMethod = _data["webhookMethod"];
+            this.webhookBody = _data["webhookBody"];
+            this.notificationTitle = _data["notificationTitle"];
+            this.notificationMessage = _data["notificationMessage"];
+            this.sceneId = _data["sceneId"];
+            this.sortOrder = _data["sortOrder"];
+        }
+    }
+
+    static fromJS(data: any): CreateActionRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new CreateActionRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["actionType"] = this.actionType;
+        data["deviceId"] = this.deviceId;
+        data["property"] = this.property;
+        data["value"] = this.value;
+        data["delaySeconds"] = this.delaySeconds;
+        data["webhookUrl"] = this.webhookUrl;
+        data["webhookMethod"] = this.webhookMethod;
+        data["webhookBody"] = this.webhookBody;
+        data["notificationTitle"] = this.notificationTitle;
+        data["notificationMessage"] = this.notificationMessage;
+        data["sceneId"] = this.sceneId;
+        data["sortOrder"] = this.sortOrder;
+        return data;
+    }
+}
+
+export interface ICreateActionRequest {
+    actionType?: ActionType;
+    deviceId?: string | undefined;
+    property?: string | undefined;
+    value?: any | undefined;
+    delaySeconds?: number | undefined;
+    webhookUrl?: string | undefined;
+    webhookMethod?: string | undefined;
+    webhookBody?: string | undefined;
+    notificationTitle?: string | undefined;
+    notificationMessage?: string | undefined;
+    sceneId?: string | undefined;
+    sortOrder?: number;
+}
+
+export class UpdateAutomationRequest implements IUpdateAutomationRequest {
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    isEnabled?: boolean;
+    triggerMode?: TriggerMode;
+    conditionMode?: ConditionMode;
+    cooldownSeconds?: number;
+    triggers?: CreateTriggerRequest[];
+    conditions?: CreateConditionRequest[];
+    actions?: CreateActionRequest[];
+
+    constructor(data?: IUpdateAutomationRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.name = _data["name"];
+            this.description = _data["description"];
+            this.icon = _data["icon"];
+            this.color = _data["color"];
+            this.isEnabled = _data["isEnabled"];
+            this.triggerMode = _data["triggerMode"];
+            this.conditionMode = _data["conditionMode"];
+            this.cooldownSeconds = _data["cooldownSeconds"];
+            if (Array.isArray(_data["triggers"])) {
+                this.triggers = [] as any;
+                for (let item of _data["triggers"])
+                    this.triggers!.push(CreateTriggerRequest.fromJS(item));
+            }
+            if (Array.isArray(_data["conditions"])) {
+                this.conditions = [] as any;
+                for (let item of _data["conditions"])
+                    this.conditions!.push(CreateConditionRequest.fromJS(item));
+            }
+            if (Array.isArray(_data["actions"])) {
+                this.actions = [] as any;
+                for (let item of _data["actions"])
+                    this.actions!.push(CreateActionRequest.fromJS(item));
+            }
+        }
+    }
+
+    static fromJS(data: any): UpdateAutomationRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new UpdateAutomationRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["name"] = this.name;
+        data["description"] = this.description;
+        data["icon"] = this.icon;
+        data["color"] = this.color;
+        data["isEnabled"] = this.isEnabled;
+        data["triggerMode"] = this.triggerMode;
+        data["conditionMode"] = this.conditionMode;
+        data["cooldownSeconds"] = this.cooldownSeconds;
+        if (Array.isArray(this.triggers)) {
+            data["triggers"] = [];
+            for (let item of this.triggers)
+                data["triggers"].push(item ? item.toJSON() : undefined as any);
+        }
+        if (Array.isArray(this.conditions)) {
+            data["conditions"] = [];
+            for (let item of this.conditions)
+                data["conditions"].push(item ? item.toJSON() : undefined as any);
+        }
+        if (Array.isArray(this.actions)) {
+            data["actions"] = [];
+            for (let item of this.actions)
+                data["actions"].push(item ? item.toJSON() : undefined as any);
+        }
+        return data;
+    }
+}
+
+export interface IUpdateAutomationRequest {
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    isEnabled?: boolean;
+    triggerMode?: TriggerMode;
+    conditionMode?: ConditionMode;
+    cooldownSeconds?: number;
+    triggers?: CreateTriggerRequest[];
+    conditions?: CreateConditionRequest[];
+    actions?: CreateActionRequest[];
+}
+
+export class AutomationExecutionLog implements IAutomationExecutionLog {
+    id?: string;
+    automationRuleId?: string;
+    executedAt?: Date;
+    status?: ExecutionStatus;
+    triggerSource?: string | undefined;
+    actionResults?: AutomationActionResult[] | undefined;
+    durationMs?: number;
+    errorMessage?: string | undefined;
+
+    constructor(data?: IAutomationExecutionLog) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.automationRuleId = _data["automationRuleId"];
+            this.executedAt = _data["executedAt"] ? new Date(_data["executedAt"].toString()) : undefined as any;
+            this.status = _data["status"];
+            this.triggerSource = _data["triggerSource"];
+            if (Array.isArray(_data["actionResults"])) {
+                this.actionResults = [] as any;
+                for (let item of _data["actionResults"])
+                    this.actionResults!.push(AutomationActionResult.fromJS(item));
+            }
+            this.durationMs = _data["durationMs"];
+            this.errorMessage = _data["errorMessage"];
+        }
+    }
+
+    static fromJS(data: any): AutomationExecutionLog {
+        data = typeof data === 'object' ? data : {};
+        let result = new AutomationExecutionLog();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["automationRuleId"] = this.automationRuleId;
+        data["executedAt"] = this.executedAt ? this.executedAt.toISOString() : undefined as any;
+        data["status"] = this.status;
+        data["triggerSource"] = this.triggerSource;
+        if (Array.isArray(this.actionResults)) {
+            data["actionResults"] = [];
+            for (let item of this.actionResults)
+                data["actionResults"].push(item ? item.toJSON() : undefined as any);
+        }
+        data["durationMs"] = this.durationMs;
+        data["errorMessage"] = this.errorMessage;
+        return data;
+    }
+}
+
+export interface IAutomationExecutionLog {
+    id?: string;
+    automationRuleId?: string;
+    executedAt?: Date;
+    status?: ExecutionStatus;
+    triggerSource?: string | undefined;
+    actionResults?: AutomationActionResult[] | undefined;
+    durationMs?: number;
+    errorMessage?: string | undefined;
+}
+
+export enum ExecutionStatus {
+    Success = 0,
+    PartialFailure = 1,
+    Failure = 2,
+    SkippedCooldown = 3,
+    SkippedCondition = 4,
+}
+
+export class AutomationActionResult implements IAutomationActionResult {
+    actionId?: string;
+    success?: boolean;
+    error?: string | undefined;
+    durationMs?: number;
+
+    constructor(data?: IAutomationActionResult) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.actionId = _data["actionId"];
+            this.success = _data["success"];
+            this.error = _data["error"];
+            this.durationMs = _data["durationMs"];
+        }
+    }
+
+    static fromJS(data: any): AutomationActionResult {
+        data = typeof data === 'object' ? data : {};
+        let result = new AutomationActionResult();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["actionId"] = this.actionId;
+        data["success"] = this.success;
+        data["error"] = this.error;
+        data["durationMs"] = this.durationMs;
+        return data;
+    }
+}
+
+export interface IAutomationActionResult {
+    actionId?: string;
+    success?: boolean;
+    error?: string | undefined;
+    durationMs?: number;
+}
+
+export class Scene implements IScene {
+    id?: string;
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    deviceStates?: { [key: string]: { [key: string]: any; }; };
+    createdAt?: Date;
+    updatedAt?: Date;
+
+    constructor(data?: IScene) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.name = _data["name"];
+            this.description = _data["description"];
+            this.icon = _data["icon"];
+            this.color = _data["color"];
+            if (_data["deviceStates"]) {
+                this.deviceStates = {} as any;
+                for (let key in _data["deviceStates"]) {
+                    if (_data["deviceStates"].hasOwnProperty(key))
+                        (this.deviceStates as any)![key] = _data["deviceStates"][key] !== undefined ? _data["deviceStates"][key] : {};
+                }
+            }
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
+            this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): Scene {
+        data = typeof data === 'object' ? data : {};
+        let result = new Scene();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["name"] = this.name;
+        data["description"] = this.description;
+        data["icon"] = this.icon;
+        data["color"] = this.color;
+        if (this.deviceStates) {
+            data["deviceStates"] = {};
+            for (let key in this.deviceStates) {
+                if (this.deviceStates.hasOwnProperty(key))
+                    (data["deviceStates"] as any)[key] = (this.deviceStates as any)[key];
+            }
+        }
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+export interface IScene {
+    id?: string;
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    deviceStates?: { [key: string]: { [key: string]: any; }; };
+    createdAt?: Date;
+    updatedAt?: Date;
+}
+
+export class CreateSceneRequest implements ICreateSceneRequest {
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    deviceStates?: { [key: string]: { [key: string]: any; }; };
+
+    constructor(data?: ICreateSceneRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.name = _data["name"];
+            this.description = _data["description"];
+            this.icon = _data["icon"];
+            this.color = _data["color"];
+            if (_data["deviceStates"]) {
+                this.deviceStates = {} as any;
+                for (let key in _data["deviceStates"]) {
+                    if (_data["deviceStates"].hasOwnProperty(key))
+                        (this.deviceStates as any)![key] = _data["deviceStates"][key] !== undefined ? _data["deviceStates"][key] : {};
+                }
+            }
+        }
+    }
+
+    static fromJS(data: any): CreateSceneRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new CreateSceneRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["name"] = this.name;
+        data["description"] = this.description;
+        data["icon"] = this.icon;
+        data["color"] = this.color;
+        if (this.deviceStates) {
+            data["deviceStates"] = {};
+            for (let key in this.deviceStates) {
+                if (this.deviceStates.hasOwnProperty(key))
+                    (data["deviceStates"] as any)[key] = (this.deviceStates as any)[key];
+            }
+        }
+        return data;
+    }
+}
+
+export interface ICreateSceneRequest {
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    deviceStates?: { [key: string]: { [key: string]: any; }; };
+}
+
+export class UpdateSceneRequest implements IUpdateSceneRequest {
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    deviceStates?: { [key: string]: { [key: string]: any; }; };
+
+    constructor(data?: IUpdateSceneRequest) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.name = _data["name"];
+            this.description = _data["description"];
+            this.icon = _data["icon"];
+            this.color = _data["color"];
+            if (_data["deviceStates"]) {
+                this.deviceStates = {} as any;
+                for (let key in _data["deviceStates"]) {
+                    if (_data["deviceStates"].hasOwnProperty(key))
+                        (this.deviceStates as any)![key] = _data["deviceStates"][key] !== undefined ? _data["deviceStates"][key] : {};
+                }
+            }
+        }
+    }
+
+    static fromJS(data: any): UpdateSceneRequest {
+        data = typeof data === 'object' ? data : {};
+        let result = new UpdateSceneRequest();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["name"] = this.name;
+        data["description"] = this.description;
+        data["icon"] = this.icon;
+        data["color"] = this.color;
+        if (this.deviceStates) {
+            data["deviceStates"] = {};
+            for (let key in this.deviceStates) {
+                if (this.deviceStates.hasOwnProperty(key))
+                    (data["deviceStates"] as any)[key] = (this.deviceStates as any)[key];
+            }
+        }
+        return data;
+    }
+}
+
+export interface IUpdateSceneRequest {
+    name?: string;
+    description?: string | undefined;
+    icon?: string | undefined;
+    color?: string | undefined;
+    deviceStates?: { [key: string]: { [key: string]: any; }; };
 }
 
 export class Device implements IDevice {

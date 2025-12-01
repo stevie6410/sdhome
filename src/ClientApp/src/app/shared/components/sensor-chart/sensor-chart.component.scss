@@ -1,0 +1,169 @@
+.sensor-chart {
+  position: relative;
+  width: 100%;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  
+  span {
+    font-size: 2rem;
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  p {
+    margin: 0;
+    font-size: 0.875rem;
+  }
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-sm) 0;
+  margin-bottom: var(--spacing-md);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.legend-value {
+  font-family: 'Fira Code', monospace;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.chart-svg {
+  display: block;
+  overflow: visible;
+}
+
+.grid-line {
+  stroke: var(--border-secondary);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0.5;
+  
+  &.vertical {
+    opacity: 0.3;
+  }
+}
+
+.axis-line {
+  stroke: var(--border-secondary);
+  stroke-width: 1;
+}
+
+.tick-label {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-family: 'Fira Code', monospace;
+  text-anchor: end;
+}
+
+.x-axis .tick-label {
+  text-anchor: middle;
+}
+
+.data-line {
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.area-fill {
+  opacity: 0.15;
+}
+
+.data-point {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.series:hover .data-point {
+  opacity: 0.6;
+}
+
+.hover-indicator {
+  pointer-events: none;
+}
+
+.hover-ring {
+  fill: transparent;
+  stroke: var(--accent-cyan);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px var(--accent-cyan));
+}
+
+.hover-line {
+  stroke: var(--accent-cyan);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0.5;
+}
+
+.chart-tooltip {
+  position: absolute;
+  background: var(--surface-1);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  pointer-events: none;
+  z-index: 100;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  min-width: 120px;
+}
+
+.tooltip-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.tooltip-value {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.tooltip-name {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.tooltip-number {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}

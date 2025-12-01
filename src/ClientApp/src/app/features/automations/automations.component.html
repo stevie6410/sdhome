@@ -1,0 +1,175 @@
+<div class="automations-page">
+  <!-- Header -->
+  <header class="page-header">
+    <div class="header-content">
+      <h1>⚡ Automations</h1>
+      <p class="subtitle">Create and manage your smart home automations</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="loadAutomations()">
+        🔄 Refresh
+      </button>
+      <a routerLink="new" class="btn btn-primary">
+        ➕ New Automation
+      </a>
+    </div>
+  </header>
+
+  <!-- Stats Cards -->
+  @if (stats(); as s) {
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-content">
+          <span class="stat-value">{{ s.totalAutomations }}</span>
+          <span class="stat-label">Total</span>
+        </div>
+      </div>
+      <div class="stat-card enabled">
+        <div class="stat-icon">✅</div>
+        <div class="stat-content">
+          <span class="stat-value">{{ s.enabledAutomations }}</span>
+          <span class="stat-label">Enabled</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏸️</div>
+        <div class="stat-content">
+          <span class="stat-value">{{ s.disabledAutomations }}</span>
+          <span class="stat-label">Disabled</span>
+        </div>
+      </div>
+      <div class="stat-card executions">
+        <div class="stat-icon">🚀</div>
+        <div class="stat-content">
+          <span class="stat-value">{{ s.totalExecutionsToday }}</span>
+          <span class="stat-label">Today</span>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input
+        type="text"
+        placeholder="Search automations..."
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+      />
+    </div>
+    <div class="filter-pills">
+      <button
+        class="filter-pill"
+        [class.active]="filterEnabled() === null"
+        (click)="setFilter(null)"
+      >
+        All
+      </button>
+      <button
+        class="filter-pill"
+        [class.active]="filterEnabled() === true"
+        (click)="setFilter(true)"
+      >
+        ✅ Enabled
+      </button>
+      <button
+        class="filter-pill"
+        [class.active]="filterEnabled() === false"
+        (click)="setFilter(false)"
+      >
+        ⏸️ Disabled
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <span>Loading automations...</span>
+    </div>
+  } @else {
+    <!-- Empty State -->
+    @if (filteredAutomations().length === 0) {
+      <div class="empty-state">
+        @if (automations().length === 0) {
+          <div class="empty-icon">🤖</div>
+          <h3>No automations yet</h3>
+          <p>Create your first automation to start controlling your home automatically</p>
+          <a routerLink="new" class="btn btn-primary">
+            ➕ Create Automation
+          </a>
+        } @else {
+          <div class="empty-icon">🔍</div>
+          <h3>No matching automations</h3>
+          <p>Try adjusting your search or filters</p>
+        }
+      </div>
+    } @else {
+      <!-- Automations Grid -->
+      <div class="automations-grid">
+        @for (automation of filteredAutomations(); track automation.id) {
+          <a [routerLink]="[automation.id]" class="automation-card" [class.disabled]="!automation.isEnabled">
+            <div class="card-header">
+              <div class="card-icon" [style.background]="automation.color || 'var(--accent-cyan)'">
+                {{ getIcon(automation) }}
+              </div>
+              <div class="card-toggle">
+                <button
+                  class="toggle-btn"
+                  [class.on]="automation.isEnabled"
+                  (click)="toggleAutomation(automation, $event)"
+                  [title]="automation.isEnabled ? 'Disable' : 'Enable'"
+                >
+                  <span class="toggle-track"></span>
+                  <span class="toggle-thumb"></span>
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <h3 class="card-title">{{ automation.name }}</h3>
+              @if (automation.description) {
+                <p class="card-description">{{ automation.description }}</p>
+              }
+              <div class="card-meta">
+                <span class="meta-item" title="Triggers">
+                  🎯 {{ automation.triggerCount }}
+                </span>
+                <span class="meta-item" title="Conditions">
+                  ❓ {{ automation.conditionCount }}
+                </span>
+                <span class="meta-item" title="Actions">
+                  ⚡ {{ automation.actionCount }}
+                </span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <div class="execution-info">
+                <span class="run-count">{{ automation.executionCount }} runs</span>
+                <span class="last-run">
+                  @if (automation.lastTriggeredAt) {
+                    Last: {{ formatDate(automation.lastTriggeredAt) }}
+                  } @else {
+                    Never run
+                  }
+                </span>
+              </div>
+              <div class="card-actions">
+                <button
+                  class="action-btn delete"
+                  (click)="deleteAutomation(automation, $event)"
+                  title="Delete"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </a>
+        }
+      </div>
+    }
+  }
+</div>

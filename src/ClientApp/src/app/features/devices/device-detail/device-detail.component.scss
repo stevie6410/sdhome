@@ -853,3 +853,80 @@ select {
 .mono {
   font-family: 'Fira Code', 'Consolas', monospace;
 }
+
+/* Chart Card */
+.chart-card {
+  @media (min-width: 768px) {
+    grid-column: span 2;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+  }
+}
+
+.time-range-selector {
+  display: flex;
+  gap: var(--spacing-xs);
+  background: var(--surface-2);
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-md);
+}
+
+.range-btn {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    color: var(--text-primary);
+    background: var(--surface-1);
+  }
+
+  &.active {
+    background: var(--accent-cyan);
+    color: var(--text-inverse);
+  }
+}
+
+.chart-container {
+  padding: var(--spacing-md);
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--spacing-xl);
+
+  .empty-icon {
+    font-size: 2rem;
+    opacity: 0.5;
+  }
+}

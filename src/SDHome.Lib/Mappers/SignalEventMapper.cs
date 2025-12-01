@@ -98,11 +98,23 @@ namespace SDHome.Lib.Mappers
                     deviceKind = DeviceKind.MotionSensor;
             }
 
+            // Contact sensors (door/window sensors)
+            if (payload.TryGetProperty("contact", out var contactProp) &&
+                (contactProp.ValueKind == JsonValueKind.True || contactProp.ValueKind == JsonValueKind.False))
+            {
+                capability = "contact";
+                eventType = "state_change";
+                eventSubType = contactProp.GetBoolean() ? "closed" : "open";
+
+                if (deviceKind == DeviceKind.Unknown)
+                    deviceKind = DeviceKind.ContactSensor;
+            }
+
             // Trigger vs telemetry
             var category = EventCategory.Telemetry;
             if (deviceKind is DeviceKind.Button or DeviceKind.MotionSensor or DeviceKind.ContactSensor
-                && capability is "button" or "motion"
-                && eventType is "press" or "detection")
+                && capability is "button" or "motion" or "contact"
+                && eventType is "press" or "detection" or "state_change")
             {
                 category = EventCategory.Trigger;
             }

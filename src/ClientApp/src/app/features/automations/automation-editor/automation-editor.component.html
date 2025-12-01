@@ -1,0 +1,843 @@
+<div class="automation-editor">
+  <!-- Header -->
+  <header class="editor-header">
+    <div class="header-content">
+      <button class="back-btn" (click)="cancel()">
+        <span class="icon">←</span>
+        Back
+      </button>
+      <h1>{{ isNew() ? 'Create Automation' : 'Edit Automation' }}</h1>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
+        Cancel
+      </button>
+      <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
+        @if (saving()) {
+          <span class="spinner-sm"></span>
+          Saving...
+        } @else {
+          Save
+        }
+      </button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading automation...</p>
+    </div>
+  } @else {
+    <div class="editor-content">
+      <!-- Basic Info -->
+      <section class="editor-section">
+        <h2 class="section-title">Basic Information</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="name">Name *</label>
+            <input
+              type="text"
+              id="name"
+              [ngModel]="name()"
+              (ngModelChange)="name.set($event)"
+              placeholder="Enter automation name"
+              class="form-input"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea
+              id="description"
+              [ngModel]="description()"
+              (ngModelChange)="description.set($event)"
+              placeholder="Optional description"
+              class="form-input"
+              rows="2"
+            ></textarea>
+          </div>
+
+          <div class="form-group icon-color-row">
+            <div class="icon-picker">
+              <label>Icon</label>
+              <div class="icon-options">
+                @for (iconOpt of iconOptions; track iconOpt) {
+                  <button
+                    type="button"
+                    class="icon-option"
+                    [class.selected]="icon() === iconOpt"
+                    (click)="icon.set(iconOpt)"
+                  >
+                    {{ iconOpt }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="color-picker">
+              <label>Color</label>
+              <div class="color-options">
+                @for (colorOpt of colorOptions; track colorOpt) {
+                  <button
+                    type="button"
+                    class="color-option"
+                    [class.selected]="color() === colorOpt"
+                    [style.background]="colorOpt"
+                    (click)="color.set(colorOpt)"
+                  ></button>
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group inline-group">
+            <label class="switch-label">
+              <input
+                type="checkbox"
+                [ngModel]="isEnabled()"
+                (ngModelChange)="isEnabled.set($event)"
+              />
+              <span class="switch"></span>
+              Enabled
+            </label>
+
+            <div class="cooldown-input">
+              <label for="cooldown">Cooldown (seconds)</label>
+              <input
+                type="number"
+                id="cooldown"
+                [ngModel]="cooldownSeconds()"
+                (ngModelChange)="cooldownSeconds.set($event)"
+                min="0"
+                class="form-input small"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Triggers -->
+      <section class="editor-section triggers-section">
+        <div class="section-header">
+          <h2 class="section-title">🎯 When this happens...</h2>
+          <div class="mode-selector">
+            <label>Mode:</label>
+            <select
+              [ngModel]="triggerMode()"
+              (ngModelChange)="triggerMode.set($event)"
+              class="form-select small"
+            >
+              <option [ngValue]="TriggerMode.Any">Any (OR)</option>
+              <option [ngValue]="TriggerMode.All">All (AND)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="items-list">
+          @for (trigger of triggers(); track trigger.id) {
+            <div class="item-card">
+              <div class="item-header">
+                <select
+                  [ngModel]="trigger.triggerType"
+                  (ngModelChange)="trigger.triggerType = $event"
+                  class="form-select"
+                >
+                  <option [ngValue]="TriggerType.DeviceState">📡 Device Event</option>
+                  <option [ngValue]="TriggerType.SensorThreshold">📊 Sensor Value</option>
+                  <option [ngValue]="TriggerType.Time">⏰ Time</option>
+                  <option [ngValue]="TriggerType.Sunrise">🌅 Sunrise</option>
+                  <option [ngValue]="TriggerType.Sunset">🌇 Sunset</option>
+                  <option [ngValue]="TriggerType.Manual">👆 Manual Only</option>
+                </select>
+                <button class="remove-btn" (click)="removeTrigger(trigger.id)">×</button>
+              </div>
+
+              @if (trigger.triggerType === TriggerType.DeviceState || trigger.triggerType === TriggerType.SensorThreshold) {
+                <div class="item-body">
+                  <!-- Device Selection -->
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label>Device</label>
+                      <select
+                        [ngModel]="trigger.deviceId"
+                        (ngModelChange)="trigger.deviceId = $event; trigger.property = ''; trigger.value = ''; onDeviceSelected($event)"
+                        class="form-select"
+                      >
+                        <option value="">Select device...</option>
+                        @for (device of devices(); track device.deviceId) {
+                          <option [value]="device.deviceId">{{ device.effectiveDisplayName || device.friendlyName }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+
+                  @if (trigger.deviceId) {
+                    <!-- Property Selection - Device Aware -->
+                    <div class="form-row">
+                      <div class="form-group flex-1">
+                        <label>Property</label>
+                        @if (getTriggerProperties(trigger.deviceId).length > 0) {
+                          <select
+                            [ngModel]="trigger.property"
+                            (ngModelChange)="trigger.property = $event; trigger.value = ''"
+                            class="form-select"
+                          >
+                            <option value="">Select property...</option>
+                            @for (prop of getTriggerProperties(trigger.deviceId); track prop.property) {
+                              <option [value]="prop.property">
+                                {{ prop.name }}
+                                @if (prop.unit) { ({{ prop.unit }}) }
+                              </option>
+                            }
+                          </select>
+                        } @else {
+                          <div class="loading-props">
+                            @if (loadingDefinitions().has(trigger.deviceId)) {
+                              <span class="spinner-sm"></span> Loading properties...
+                            } @else {
+                              <input
+                                type="text"
+                                [ngModel]="trigger.property"
+                                (ngModelChange)="trigger.property = $event"
+                                placeholder="Property name (e.g., state, action)"
+                                class="form-input"
+                              />
+                            }
+                          </div>
+                        }
+                      </div>
+                    </div>
+
+                    @if (trigger.property) {
+                      <!-- Operator and Value Selection -->
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>When</label>
+                          <select
+                            [ngModel]="trigger.operator"
+                            (ngModelChange)="trigger.operator = $event"
+                            class="form-select"
+                          >
+                            @for (op of getSuggestedOperators(trigger.deviceId, trigger.property); track op) {
+                              <option [ngValue]="op">{{ getOperatorLabel(op) }}</option>
+                            }
+                          </select>
+                        </div>
+
+                        @if (trigger.operator !== ComparisonOperator.AnyChange) {
+                          <div class="form-group flex-1">
+                            <label>Value</label>
+                            <!-- Enum/Button values -->
+                            @if (hasEnumValues(trigger.deviceId, trigger.property)) {
+                              <select
+                                [ngModel]="trigger.value"
+                                (ngModelChange)="trigger.value = $event"
+                                class="form-select"
+                              >
+                                <option value="">Select value...</option>
+                                @for (val of getPropertyValues(trigger.deviceId, trigger.property); track val) {
+                                  <option [value]="val">{{ val }}</option>
+                                }
+                              </select>
+                            }
+                            <!-- Binary on/off -->
+                            @else if (isBinaryProperty(trigger.deviceId, trigger.property)) {
+                              <select
+                                [ngModel]="trigger.value"
+                                (ngModelChange)="trigger.value = $event"
+                                class="form-select"
+                              >
+                                <option value="">Select state...</option>
+                                <option [value]="getPropertyInfo(trigger.deviceId, trigger.property)?.valueOn">ON</option>
+                                <option [value]="getPropertyInfo(trigger.deviceId, trigger.property)?.valueOff">OFF</option>
+                              </select>
+                            }
+                            <!-- Numeric -->
+                            @else if (isNumericProperty(trigger.deviceId, trigger.property)) {
+                              <div class="numeric-input">
+                                <input
+                                  type="number"
+                                  [ngModel]="trigger.value"
+                                  (ngModelChange)="trigger.value = $event"
+                                  [attr.min]="getPropertyInfo(trigger.deviceId, trigger.property)?.valueMin"
+                                  [attr.max]="getPropertyInfo(trigger.deviceId, trigger.property)?.valueMax"
+                                  [attr.step]="getPropertyInfo(trigger.deviceId, trigger.property)?.valueStep ?? 1"
+                                  class="form-input"
+                                />
+                                @if (getPropertyInfo(trigger.deviceId, trigger.property)?.unit) {
+                                  <span class="unit">{{ getPropertyInfo(trigger.deviceId, trigger.property)?.unit }}</span>
+                                }
+                              </div>
+                            }
+                            <!-- Default text input -->
+                            @else {
+                              <input
+                                type="text"
+                                [ngModel]="trigger.value"
+                                (ngModelChange)="trigger.value = $event"
+                                placeholder="Enter value"
+                                class="form-input"
+                              />
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  }
+                </div>
+              }
+
+              @if (trigger.triggerType === TriggerType.Time) {
+                <div class="item-body">
+                  <div class="form-group">
+                    <label>Time</label>
+                    <input
+                      type="time"
+                      [ngModel]="trigger.timeExpression"
+                      (ngModelChange)="trigger.timeExpression = $event"
+                      class="form-input"
+                    />
+                    <span class="help-text">Or use cron: 0 8 * * * (8am daily)</span>
+                  </div>
+                </div>
+              }
+
+              @if (trigger.triggerType === TriggerType.Sunrise || trigger.triggerType === TriggerType.Sunset) {
+                <div class="item-body">
+                  <div class="form-group">
+                    <label>Offset (minutes)</label>
+                    <input
+                      type="number"
+                      [ngModel]="trigger.offsetMinutes"
+                      (ngModelChange)="trigger.offsetMinutes = $event"
+                      class="form-input small"
+                      placeholder="0"
+                    />
+                    <span class="help-text">Negative = before, Positive = after</span>
+                  </div>
+                </div>
+              }
+
+              @if (trigger.triggerType === TriggerType.Manual) {
+                <div class="item-body">
+                  <div class="manual-info">
+                    <span class="icon">👆</span>
+                    <span>This automation will only run when manually triggered</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <button class="add-btn" (click)="addTrigger()">
+          + Add Trigger
+        </button>
+      </section>
+
+      <!-- Conditions -->
+      <section class="editor-section conditions-section">
+        <div class="section-header">
+          <h2 class="section-title">🔍 Only if... (Optional)</h2>
+          <div class="mode-selector">
+            <label>Mode:</label>
+            <select
+              [ngModel]="conditionMode()"
+              (ngModelChange)="conditionMode.set($event)"
+              class="form-select small"
+            >
+              <option [ngValue]="ConditionMode.All">All (AND)</option>
+              <option [ngValue]="ConditionMode.Any">Any (OR)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="items-list">
+          @for (condition of conditions(); track condition.id) {
+            <div class="item-card">
+              <div class="item-header">
+                <select
+                  [ngModel]="condition.conditionType"
+                  (ngModelChange)="condition.conditionType = $event"
+                  class="form-select"
+                >
+                  <option [ngValue]="ConditionType.DeviceState">📡 Device State</option>
+                  <option [ngValue]="ConditionType.TimeRange">⏰ Time Range</option>
+                  <option [ngValue]="ConditionType.DayOfWeek">📅 Day of Week</option>
+                  <option [ngValue]="ConditionType.SunPosition">☀️ Sun Position</option>
+                </select>
+                <button class="remove-btn" (click)="removeCondition(condition.id)">×</button>
+              </div>
+
+              @if (condition.conditionType === ConditionType.DeviceState) {
+                <div class="item-body">
+                  <!-- Device Selection -->
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label>Device</label>
+                      <select
+                        [ngModel]="condition.deviceId"
+                        (ngModelChange)="condition.deviceId = $event; condition.property = ''; condition.value = ''; onDeviceSelected($event)"
+                        class="form-select"
+                      >
+                        <option value="">Select device...</option>
+                        @for (device of devices(); track device.deviceId) {
+                          <option [value]="device.deviceId">{{ device.effectiveDisplayName || device.friendlyName }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+
+                  @if (condition.deviceId) {
+                    <!-- Property Selection -->
+                    <div class="form-row">
+                      <div class="form-group flex-1">
+                        <label>Property</label>
+                        @if (getTriggerProperties(condition.deviceId).length > 0) {
+                          <select
+                            [ngModel]="condition.property"
+                            (ngModelChange)="condition.property = $event; condition.value = ''"
+                            class="form-select"
+                          >
+                            <option value="">Select property...</option>
+                            @for (prop of getTriggerProperties(condition.deviceId); track prop.property) {
+                              <option [value]="prop.property">
+                                {{ prop.name }}
+                                @if (prop.unit) { ({{ prop.unit }}) }
+                              </option>
+                            }
+                          </select>
+                        } @else {
+                          <input
+                            type="text"
+                            [ngModel]="condition.property"
+                            (ngModelChange)="condition.property = $event"
+                            placeholder="Property name"
+                            class="form-input"
+                          />
+                        }
+                      </div>
+                    </div>
+
+                    @if (condition.property) {
+                      <!-- Operator and Value -->
+                      <div class="form-row">
+                        <div class="form-group">
+                          <label>Is</label>
+                          <select
+                            [ngModel]="condition.operator"
+                            (ngModelChange)="condition.operator = $event"
+                            class="form-select"
+                          >
+                            <option [ngValue]="ComparisonOperator.Equals">= Equals</option>
+                            <option [ngValue]="ComparisonOperator.NotEquals">≠ Not Equals</option>
+                            <option [ngValue]="ComparisonOperator.GreaterThan">&gt; Greater Than</option>
+                            <option [ngValue]="ComparisonOperator.LessThan">&lt; Less Than</option>
+                            <option [ngValue]="ComparisonOperator.Between">↔ Between</option>
+                          </select>
+                        </div>
+
+                        <div class="form-group flex-1">
+                          <label>Value</label>
+                          <!-- Enum values -->
+                          @if (hasEnumValues(condition.deviceId, condition.property)) {
+                            <select
+                              [ngModel]="condition.value"
+                              (ngModelChange)="condition.value = $event"
+                              class="form-select"
+                            >
+                              <option value="">Select value...</option>
+                              @for (val of getPropertyValues(condition.deviceId, condition.property); track val) {
+                                <option [value]="val">{{ val }}</option>
+                              }
+                            </select>
+                          }
+                          <!-- Binary -->
+                          @else if (isBinaryProperty(condition.deviceId, condition.property)) {
+                            <select
+                              [ngModel]="condition.value"
+                              (ngModelChange)="condition.value = $event"
+                              class="form-select"
+                            >
+                              <option value="">Select state...</option>
+                              <option [value]="getPropertyInfo(condition.deviceId, condition.property)?.valueOn">ON</option>
+                              <option [value]="getPropertyInfo(condition.deviceId, condition.property)?.valueOff">OFF</option>
+                            </select>
+                          }
+                          <!-- Numeric -->
+                          @else if (isNumericProperty(condition.deviceId, condition.property)) {
+                            <input
+                              type="number"
+                              [ngModel]="condition.value"
+                              (ngModelChange)="condition.value = $event"
+                              class="form-input"
+                            />
+                          }
+                          @else {
+                            <input
+                              type="text"
+                              [ngModel]="condition.value"
+                              (ngModelChange)="condition.value = $event"
+                              placeholder="Value"
+                              class="form-input"
+                            />
+                          }
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+
+              @if (condition.conditionType === ConditionType.TimeRange) {
+                <div class="item-body">
+                  <div class="form-row align-center">
+                    <div class="form-group">
+                      <label>Between</label>
+                      <input
+                        type="time"
+                        [ngModel]="condition.timeStart"
+                        (ngModelChange)="condition.timeStart = $event"
+                        class="form-input"
+                      />
+                    </div>
+                    <span class="connector-text">and</span>
+                    <div class="form-group">
+                      <label>And</label>
+                      <input
+                        type="time"
+                        [ngModel]="condition.timeEnd"
+                        (ngModelChange)="condition.timeEnd = $event"
+                        class="form-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+              }
+
+              @if (condition.conditionType === ConditionType.DayOfWeek) {
+                <div class="item-body">
+                  <label>Active on days:</label>
+                  <div class="day-picker">
+                    @for (day of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track day; let i = $index) {
+                      <button
+                        type="button"
+                        class="day-btn"
+                        [class.selected]="condition.daysOfWeek.includes(i)"
+                        (click)="toggleDay(condition, i)"
+                      >
+                        {{ day }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (condition.conditionType === ConditionType.SunPosition) {
+                <div class="item-body">
+                  <div class="form-group">
+                    <label>When sun is</label>
+                    <select
+                      [ngModel]="condition.value"
+                      (ngModelChange)="condition.value = $event"
+                      class="form-select"
+                    >
+                      <option value="above_horizon">☀️ Above horizon (day)</option>
+                      <option value="below_horizon">🌙 Below horizon (night)</option>
+                    </select>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <button class="add-btn" (click)="addCondition()">
+          + Add Condition
+        </button>
+      </section>
+
+      <!-- Actions -->
+      <section class="editor-section actions-section">
+        <h2 class="section-title">⚡ Then do this...</h2>
+
+        <div class="items-list">
+          @for (action of actions(); track action.id; let i = $index) {
+            <div class="item-card">
+              <div class="item-header">
+                <span class="step-number">{{ i + 1 }}</span>
+                <select
+                  [ngModel]="action.actionType"
+                  (ngModelChange)="action.actionType = $event"
+                  class="form-select"
+                >
+                  <option [ngValue]="ActionType.SetDeviceState">📡 Set Device State</option>
+                  <option [ngValue]="ActionType.ToggleDevice">🔄 Toggle Device</option>
+                  <option [ngValue]="ActionType.Delay">⏱️ Wait / Delay</option>
+                  <option [ngValue]="ActionType.Webhook">🌐 Call Webhook</option>
+                  <option [ngValue]="ActionType.Notification">🔔 Send Notification</option>
+                </select>
+                <button class="remove-btn" (click)="removeAction(action.id)">×</button>
+              </div>
+
+              @if (action.actionType === ActionType.SetDeviceState) {
+                <div class="item-body">
+                  <!-- Device Selection -->
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label>Device</label>
+                      <select
+                        [ngModel]="action.deviceId"
+                        (ngModelChange)="action.deviceId = $event; action.property = ''; action.value = ''; onDeviceSelected($event)"
+                        class="form-select"
+                      >
+                        <option value="">Select device...</option>
+                        @for (device of devices(); track device.deviceId) {
+                          <option [value]="device.deviceId">{{ device.effectiveDisplayName || device.friendlyName }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+
+                  @if (action.deviceId) {
+                    <!-- Property Selection (writable only) -->
+                    <div class="form-row">
+                      <div class="form-group flex-1">
+                        <label>Property</label>
+                        @if (getActionProperties(action.deviceId).length > 0) {
+                          <select
+                            [ngModel]="action.property"
+                            (ngModelChange)="action.property = $event; action.value = ''"
+                            class="form-select"
+                          >
+                            <option value="">Select property...</option>
+                            @for (prop of getActionProperties(action.deviceId); track prop.property) {
+                              <option [value]="prop.property">
+                                {{ prop.name }}
+                                @if (prop.unit) { ({{ prop.unit }}) }
+                              </option>
+                            }
+                          </select>
+                        } @else {
+                          <div class="loading-props">
+                            @if (loadingDefinitions().has(action.deviceId)) {
+                              <span class="spinner-sm"></span> Loading properties...
+                            } @else {
+                              <input
+                                type="text"
+                                [ngModel]="action.property"
+                                (ngModelChange)="action.property = $event"
+                                placeholder="Property name (e.g., state)"
+                                class="form-input"
+                              />
+                            }
+                          </div>
+                        }
+                      </div>
+                    </div>
+
+                    @if (action.property) {
+                      <!-- Value Selection -->
+                      <div class="form-row">
+                        <div class="form-group flex-1">
+                          <label>Set to</label>
+                          <!-- Enum values -->
+                          @if (hasEnumValues(action.deviceId, action.property)) {
+                            <select
+                              [ngModel]="action.value"
+                              (ngModelChange)="action.value = $event"
+                              class="form-select"
+                            >
+                              <option value="">Select value...</option>
+                              @for (val of getPropertyValues(action.deviceId, action.property); track val) {
+                                <option [value]="val">{{ val }}</option>
+                              }
+                            </select>
+                          }
+                          <!-- Binary on/off -->
+                          @else if (isBinaryProperty(action.deviceId, action.property)) {
+                            <div class="binary-buttons">
+                              <button
+                                type="button"
+                                class="binary-btn on"
+                                [class.selected]="action.value === getPropertyInfo(action.deviceId, action.property)?.valueOn?.toString()"
+                                (click)="action.value = getPropertyInfo(action.deviceId, action.property)?.valueOn?.toString() || 'ON'"
+                              >
+                                ✓ ON
+                              </button>
+                              <button
+                                type="button"
+                                class="binary-btn off"
+                                [class.selected]="action.value === getPropertyInfo(action.deviceId, action.property)?.valueOff?.toString()"
+                                (click)="action.value = getPropertyInfo(action.deviceId, action.property)?.valueOff?.toString() || 'OFF'"
+                              >
+                                ✗ OFF
+                              </button>
+                            </div>
+                          }
+                          <!-- Numeric with slider -->
+                          @else if (isNumericProperty(action.deviceId, action.property)) {
+                            <div class="slider-input">
+                              <input
+                                type="range"
+                                [ngModel]="action.value"
+                                (ngModelChange)="action.value = $event"
+                                [attr.min]="getPropertyInfo(action.deviceId, action.property)?.valueMin ?? 0"
+                                [attr.max]="getPropertyInfo(action.deviceId, action.property)?.valueMax ?? 100"
+                                [attr.step]="getPropertyInfo(action.deviceId, action.property)?.valueStep ?? 1"
+                                class="slider"
+                              />
+                              <input
+                                type="number"
+                                [ngModel]="action.value"
+                                (ngModelChange)="action.value = $event"
+                                class="form-input small"
+                              />
+                              @if (getPropertyInfo(action.deviceId, action.property)?.unit) {
+                                <span class="unit">{{ getPropertyInfo(action.deviceId, action.property)?.unit }}</span>
+                              }
+                            </div>
+                          }
+                          @else {
+                            <input
+                              type="text"
+                              [ngModel]="action.value"
+                              (ngModelChange)="action.value = $event"
+                              placeholder="Value"
+                              class="form-input"
+                            />
+                          }
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+
+              @if (action.actionType === ActionType.ToggleDevice) {
+                <div class="item-body">
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label>Device to toggle</label>
+                      <select
+                        [ngModel]="action.deviceId"
+                        (ngModelChange)="action.deviceId = $event; action.property = 'state'"
+                        class="form-select"
+                      >
+                        <option value="">Select device...</option>
+                        @for (device of devices(); track device.deviceId) {
+                          <option [value]="device.deviceId">{{ device.effectiveDisplayName || device.friendlyName }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                  <div class="toggle-info">
+                    <span class="icon">🔄</span>
+                    <span>Will toggle ON → OFF or OFF → ON</span>
+                  </div>
+                </div>
+              }
+
+              @if (action.actionType === ActionType.Delay) {
+                <div class="item-body">
+                  <div class="form-group">
+                    <label>Wait for</label>
+                    <div class="delay-input">
+                      <input
+                        type="number"
+                        [ngModel]="action.delaySeconds"
+                        (ngModelChange)="action.delaySeconds = $event"
+                        min="1"
+                        class="form-input"
+                      />
+                      <span class="unit">seconds</span>
+                    </div>
+                    <span class="help-text">Actions after this will wait</span>
+                  </div>
+                </div>
+              }
+
+              @if (action.actionType === ActionType.Webhook) {
+                <div class="item-body">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Method</label>
+                      <select
+                        [ngModel]="action.webhookMethod"
+                        (ngModelChange)="action.webhookMethod = $event"
+                        class="form-select"
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                      </select>
+                    </div>
+                    <div class="form-group flex-1">
+                      <label>URL</label>
+                      <input
+                        type="url"
+                        [ngModel]="action.webhookUrl"
+                        (ngModelChange)="action.webhookUrl = $event"
+                        placeholder="https://example.com/webhook"
+                        class="form-input"
+                      />
+                    </div>
+                  </div>
+                  @if (action.webhookMethod !== 'GET') {
+                    <div class="form-group">
+                      <label>Request Body (JSON)</label>
+                      <textarea
+                        [ngModel]="action.webhookBody"
+                        (ngModelChange)="action.webhookBody = $event"
+                        placeholder='{"key": "value"}'
+                        class="form-input full"
+                        rows="3"
+                      ></textarea>
+                    </div>
+                  }
+                </div>
+              }
+
+              @if (action.actionType === ActionType.Notification) {
+                <div class="item-body">
+                  <div class="form-group">
+                    <label>Title</label>
+                    <input
+                      type="text"
+                      [ngModel]="action.notificationTitle"
+                      (ngModelChange)="action.notificationTitle = $event"
+                      placeholder="Notification title"
+                      class="form-input full"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Message</label>
+                    <textarea
+                      [ngModel]="action.notificationMessage"
+                      (ngModelChange)="action.notificationMessage = $event"
+                      placeholder="Notification message..."
+                      class="form-input full"
+                      rows="2"
+                    ></textarea>
+                  </div>
+                </div>
+              }
+            </div>
+
+            @if (i < actions().length - 1) {
+              <div class="action-connector">
+                <span class="arrow">↓</span>
+              </div>
+            }
+          }
+        </div>
+
+        <button class="add-btn" (click)="addAction()">
+          + Add Action
+        </button>
+      </section>
+    </div>
+  }
+</div>

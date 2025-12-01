@@ -10,6 +10,14 @@ public class SignalsDbContext(DbContextOptions<SignalsDbContext> options) : DbCo
     public DbSet<TriggerEventEntity> TriggerEvents => Set<TriggerEventEntity>();
     public DbSet<DeviceEntity> Devices => Set<DeviceEntity>();
     public DbSet<ZoneEntity> Zones => Set<ZoneEntity>();
+    
+    // Automation entities
+    public DbSet<AutomationRuleEntity> AutomationRules => Set<AutomationRuleEntity>();
+    public DbSet<AutomationTriggerEntity> AutomationTriggers => Set<AutomationTriggerEntity>();
+    public DbSet<AutomationConditionEntity> AutomationConditions => Set<AutomationConditionEntity>();
+    public DbSet<AutomationActionEntity> AutomationActions => Set<AutomationActionEntity>();
+    public DbSet<AutomationExecutionLogEntity> AutomationExecutionLogs => Set<AutomationExecutionLogEntity>();
+    public DbSet<SceneEntity> Scenes => Set<SceneEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -150,6 +158,164 @@ public class SignalsDbContext(DbContextOptions<SignalsDbContext> options) : DbCo
 
             entity.HasIndex(e => e.ParentZoneId).HasDatabaseName("idx_zones_parent_zone_id");
             entity.HasIndex(e => e.Name).HasDatabaseName("idx_zones_name");
+        });
+
+        // ===== AUTOMATION ENTITIES =====
+
+        // AutomationRule configuration
+        modelBuilder.Entity<AutomationRuleEntity>(entity =>
+        {
+            entity.ToTable("automation_rules");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(1000);
+            entity.Property(e => e.Icon).HasColumnName("icon").HasMaxLength(100);
+            entity.Property(e => e.Color).HasColumnName("color").HasMaxLength(50);
+            entity.Property(e => e.IsEnabled).HasColumnName("is_enabled");
+            entity.Property(e => e.TriggerMode).HasColumnName("trigger_mode").HasMaxLength(50);
+            entity.Property(e => e.ConditionMode).HasColumnName("condition_mode").HasMaxLength(50);
+            entity.Property(e => e.CooldownSeconds).HasColumnName("cooldown_seconds");
+            entity.Property(e => e.LastTriggeredAt).HasColumnName("last_triggered_at").HasColumnType("datetime2");
+            entity.Property(e => e.ExecutionCount).HasColumnName("execution_count");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2");
+
+            entity.HasIndex(e => e.IsEnabled).HasDatabaseName("idx_automation_rules_enabled");
+            entity.HasIndex(e => e.Name).HasDatabaseName("idx_automation_rules_name");
+        });
+
+        // AutomationTrigger configuration
+        modelBuilder.Entity<AutomationTriggerEntity>(entity =>
+        {
+            entity.ToTable("automation_triggers");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AutomationRuleId).HasColumnName("automation_rule_id");
+            entity.Property(e => e.TriggerType).HasColumnName("trigger_type").HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DeviceId).HasColumnName("device_id").HasMaxLength(255);
+            entity.Property(e => e.Property).HasColumnName("property").HasMaxLength(255);
+            entity.Property(e => e.Operator).HasColumnName("operator").HasMaxLength(100);
+            entity.Property(e => e.Value).HasColumnName("value").HasColumnType("nvarchar(max)");
+            entity.Property(e => e.TimeExpression).HasColumnName("time_expression").HasMaxLength(255);
+            entity.Property(e => e.SunEvent).HasColumnName("sun_event").HasMaxLength(50);
+            entity.Property(e => e.OffsetMinutes).HasColumnName("offset_minutes");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+
+            entity.HasOne(e => e.AutomationRule)
+                .WithMany(r => r.Triggers)
+                .HasForeignKey(e => e.AutomationRuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.AutomationRuleId).HasDatabaseName("idx_automation_triggers_rule_id");
+            entity.HasIndex(e => e.DeviceId).HasDatabaseName("idx_automation_triggers_device_id");
+            entity.HasIndex(e => e.TriggerType).HasDatabaseName("idx_automation_triggers_type");
+        });
+
+        // AutomationCondition configuration
+        modelBuilder.Entity<AutomationConditionEntity>(entity =>
+        {
+            entity.ToTable("automation_conditions");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AutomationRuleId).HasColumnName("automation_rule_id");
+            entity.Property(e => e.ConditionType).HasColumnName("condition_type").HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DeviceId).HasColumnName("device_id").HasMaxLength(255);
+            entity.Property(e => e.Property).HasColumnName("property").HasMaxLength(255);
+            entity.Property(e => e.Operator).HasColumnName("operator").HasMaxLength(100);
+            entity.Property(e => e.Value).HasColumnName("value").HasColumnType("nvarchar(max)");
+            entity.Property(e => e.Value2).HasColumnName("value2").HasColumnType("nvarchar(max)");
+            entity.Property(e => e.TimeStart).HasColumnName("time_start").HasMaxLength(10);
+            entity.Property(e => e.TimeEnd).HasColumnName("time_end").HasMaxLength(10);
+            entity.Property(e => e.DaysOfWeek).HasColumnName("days_of_week").HasMaxLength(50);
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+
+            entity.HasOne(e => e.AutomationRule)
+                .WithMany(r => r.Conditions)
+                .HasForeignKey(e => e.AutomationRuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.AutomationRuleId).HasDatabaseName("idx_automation_conditions_rule_id");
+        });
+
+        // AutomationAction configuration
+        modelBuilder.Entity<AutomationActionEntity>(entity =>
+        {
+            entity.ToTable("automation_actions");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AutomationRuleId).HasColumnName("automation_rule_id");
+            entity.Property(e => e.ActionType).HasColumnName("action_type").HasMaxLength(100).IsRequired();
+            entity.Property(e => e.DeviceId).HasColumnName("device_id").HasMaxLength(255);
+            entity.Property(e => e.Property).HasColumnName("property").HasMaxLength(255);
+            entity.Property(e => e.Value).HasColumnName("value").HasColumnType("nvarchar(max)");
+            entity.Property(e => e.DelaySeconds).HasColumnName("delay_seconds");
+            entity.Property(e => e.WebhookUrl).HasColumnName("webhook_url").HasMaxLength(2000);
+            entity.Property(e => e.WebhookMethod).HasColumnName("webhook_method").HasMaxLength(20);
+            entity.Property(e => e.WebhookBody).HasColumnName("webhook_body").HasColumnType("nvarchar(max)");
+            entity.Property(e => e.NotificationTitle).HasColumnName("notification_title").HasMaxLength(255);
+            entity.Property(e => e.NotificationMessage).HasColumnName("notification_message").HasMaxLength(2000);
+            entity.Property(e => e.SceneId).HasColumnName("scene_id");
+            entity.Property(e => e.SortOrder).HasColumnName("sort_order");
+
+            entity.HasOne(e => e.AutomationRule)
+                .WithMany(r => r.Actions)
+                .HasForeignKey(e => e.AutomationRuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.AutomationRuleId).HasDatabaseName("idx_automation_actions_rule_id");
+            entity.HasIndex(e => e.DeviceId).HasDatabaseName("idx_automation_actions_device_id");
+        });
+
+        // AutomationExecutionLog configuration
+        modelBuilder.Entity<AutomationExecutionLogEntity>(entity =>
+        {
+            entity.ToTable("automation_execution_logs");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AutomationRuleId).HasColumnName("automation_rule_id");
+            entity.Property(e => e.ExecutedAt).HasColumnName("executed_at").HasColumnType("datetime2");
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50);
+            entity.Property(e => e.TriggerSource).HasColumnName("trigger_source").HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ActionResults).HasColumnName("action_results").HasColumnType("nvarchar(max)");
+            entity.Property(e => e.DurationMs).HasColumnName("duration_ms");
+            entity.Property(e => e.ErrorMessage).HasColumnName("error_message").HasColumnType("nvarchar(max)");
+
+            entity.HasOne(e => e.AutomationRule)
+                .WithMany(r => r.ExecutionLogs)
+                .HasForeignKey(e => e.AutomationRuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.AutomationRuleId, e.ExecutedAt })
+                .HasDatabaseName("idx_automation_logs_rule_executed")
+                .IsDescending(false, true);
+            entity.HasIndex(e => e.ExecutedAt)
+                .HasDatabaseName("idx_automation_logs_executed")
+                .IsDescending(true);
+            entity.HasIndex(e => e.Status).HasDatabaseName("idx_automation_logs_status");
+        });
+
+        // Scene configuration
+        modelBuilder.Entity<SceneEntity>(entity =>
+        {
+            entity.ToTable("scenes");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(1000);
+            entity.Property(e => e.Icon).HasColumnName("icon").HasMaxLength(100);
+            entity.Property(e => e.Color).HasColumnName("color").HasMaxLength(50);
+            entity.Property(e => e.DeviceStates).HasColumnName("device_states").HasColumnType("nvarchar(max)");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2");
+
+            entity.HasIndex(e => e.Name).HasDatabaseName("idx_scenes_name");
         });
     }
 }

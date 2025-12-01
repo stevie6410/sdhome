@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import {
   DevicesApiService,
+  ReadingsApiService,
+  SensorReading,
   Device,
   DeviceType,
   DeviceDefinition,
@@ -12,11 +14,12 @@ import {
   SetDeviceStateRequest,
 } from '../../../api/sdhome-client';
 import { SignalRService, DeviceStateUpdate } from '../../../core/services/signalr.service';
+import { SensorChartComponent, ChartSeries } from '../../../shared/components/sensor-chart/sensor-chart.component';
 
 @Component({
   selector: 'app-device-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, SensorChartComponent],
   templateUrl: './device-detail.component.html',
   styleUrl: './device-detail.component.scss',
 })
@@ -24,6 +27,7 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private apiService = inject(DevicesApiService);
+  private readingsService = inject(ReadingsApiService);
   private signalR = inject(SignalRService);
 
   // Expose ControlType enum for template
@@ -40,6 +44,11 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
   loadingDefinition = signal(false);
   saving = signal(false);
   error = signal<string | null>(null);
+
+  // Sensor readings history
+  sensorReadings = signal<SensorReading[]>([]);
+  loadingReadings = signal(false);
+  selectedTimeRange = signal<'1h' | '6h' | '24h' | '7d'>('24h');
 
   // Edit state
   editingSettings = signal(false);
@@ -153,6 +162,65 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
     );
   });
 
+  // Numeric sensor capabilities (for charting)
+  numericSensorCapabilities = computed(() => {
+    const readOnly = this.readOnlyCapabilities();
+    // Filter to numeric sensor types
+    const sensorProps = ['temperature', 'humidity', 'pressure', 'illuminance', 'battery', 'voltage', 'power', 'energy', 'linkquality'];
+    return readOnly.filter(cap =>
+      sensorProps.includes(cap.property?.toLowerCase() ?? '') ||
+      cap.type === 'numeric'
+    );
+  });
+
+  // Check if device has sensor data worth charting
+  hasSensorHistory = computed(() => {
+    return this.numericSensorCapabilities().length > 0 && this.sensorReadings().length > 0;
+  });
+
+  // Convert sensor readings to chart series
+  chartSeries = computed<ChartSeries[]>(() => {
+    const readings = this.sensorReadings();
+    const caps = this.numericSensorCapabilities();
+
+    if (readings.length === 0) return [];
+
+    // Group readings by metric
+    const byMetric = new Map<string, SensorReading[]>();
+    for (const r of readings) {
+      if (!r.metric) continue;
+      if (!byMetric.has(r.metric)) {
+        byMetric.set(r.metric, []);
+      }
+      byMetric.get(r.metric)!.push(r);
+    }
+
+    // Create series for each metric
+    const series: ChartSeries[] = [];
+    const colors = ['#00f5ff', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444'];
+    let colorIndex = 0;
+
+    for (const [metric, metricReadings] of byMetric) {
+      // Find matching capability for unit info
+      const cap = caps.find(c => c.property?.toLowerCase() === metric.toLowerCase());
+
+      series.push({
+        name: this.formatMetricName(metric),
+        unit: cap?.unit || metricReadings[0]?.unit || '',
+        color: colors[colorIndex % colors.length],
+        data: metricReadings
+          .filter(r => r.timestampUtc && r.value !== undefined && r.value !== null)
+          .map(r => ({
+            timestamp: r.timestampUtc!,
+            value: r.value!,
+          })),
+      });
+      colorIndex++;
+    }
+
+    return series;
+  });
+
   // Quick actions (primary controls like on/off, brightness)
   quickActions = computed(() => {
     const controllable = this.controllableCapabilities();
@@ -190,6 +258,7 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
         this.deviceId.set(id);
         this.loadDevice();
         this.loadDefinition();
+        this.loadSensorReadings();
         // Subscribe to device-specific SignalR updates for faster response
         this.signalR.subscribeToDevice(id);
       }
@@ -272,6 +341,47 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
     } finally {
       this.loadingDefinition.set(false);
     }
+  }
+
+  async loadSensorReadings() {
+    this.loadingReadings.set(true);
+
+    try {
+      const hours = this.getTimeRangeHours();
+      const readings = await this.readingsService.getReadingsForDevice(
+        this.deviceId(),
+        500,  // take up to 500 readings
+        hours
+      ).toPromise();
+      this.sensorReadings.set(readings ?? []);
+    } catch (err: any) {
+      console.error('Error loading sensor readings:', err);
+      // Don't set error - readings are optional
+    } finally {
+      this.loadingReadings.set(false);
+    }
+  }
+
+  private getTimeRangeHours(): number {
+    switch (this.selectedTimeRange()) {
+      case '1h': return 1;
+      case '6h': return 6;
+      case '24h': return 24;
+      case '7d': return 168;
+      default: return 24;
+    }
+  }
+
+  setTimeRange(range: '1h' | '6h' | '24h' | '7d') {
+    this.selectedTimeRange.set(range);
+    this.loadSensorReadings();
+  }
+
+  private formatMetricName(metric: string): string {
+    // Convert snake_case to Title Case
+    return metric
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
   }
 
   // Get current value for a capability (pure read - no side effects)
@@ -541,5 +651,6 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
   refresh() {
     this.loadDevice();
     this.loadDefinition();
+    this.loadSensorReadings();
   }
 }

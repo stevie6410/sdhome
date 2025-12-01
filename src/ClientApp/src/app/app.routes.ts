@@ -42,6 +42,18 @@ export const routes: Routes = [
       {
         path: 'zones/manage',
         loadComponent: () => import('./features/zones/zone-manager/zone-manager.component').then(m => m.ZoneManagerComponent)
+      },
+      {
+        path: 'automations',
+        loadComponent: () => import('./features/automations/automations.component').then(m => m.AutomationsComponent)
+      },
+      {
+        path: 'automations/new',
+        loadComponent: () => import('./features/automations/automation-editor/automation-editor.component').then(m => m.AutomationEditorComponent)
+      },
+      {
+        path: 'automations/:id',
+        loadComponent: () => import('./features/automations/automation-editor/automation-editor.component').then(m => m.AutomationEditorComponent)
       }
     ]
   }

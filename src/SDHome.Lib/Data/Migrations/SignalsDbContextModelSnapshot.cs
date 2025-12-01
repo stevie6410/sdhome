@@ -22,6 +22,347 @@ namespace SDHome.Lib.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationActionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("action_type");
+
+                    b.Property<Guid>("AutomationRuleId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("automation_rule_id");
+
+                    b.Property<int?>("DelaySeconds")
+                        .HasColumnType("int")
+                        .HasColumnName("delay_seconds");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("device_id");
+
+                    b.Property<string>("NotificationMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("notification_message");
+
+                    b.Property<string>("NotificationTitle")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("notification_title");
+
+                    b.Property<string>("Property")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("property");
+
+                    b.Property<Guid?>("SceneId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("scene_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("value");
+
+                    b.Property<string>("WebhookBody")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("webhook_body");
+
+                    b.Property<string>("WebhookMethod")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("webhook_method");
+
+                    b.Property<string>("WebhookUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("webhook_url");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AutomationRuleId")
+                        .HasDatabaseName("idx_automation_actions_rule_id");
+
+                    b.HasIndex("DeviceId")
+                        .HasDatabaseName("idx_automation_actions_device_id");
+
+                    b.ToTable("automation_actions", (string)null);
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationConditionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AutomationRuleId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("automation_rule_id");
+
+                    b.Property<string>("ConditionType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("condition_type");
+
+                    b.Property<string>("DaysOfWeek")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("days_of_week");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("device_id");
+
+                    b.Property<string>("Operator")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("operator");
+
+                    b.Property<string>("Property")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("property");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("TimeEnd")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasColumnName("time_end");
+
+                    b.Property<string>("TimeStart")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasColumnName("time_start");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("value");
+
+                    b.Property<string>("Value2")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("value2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AutomationRuleId")
+                        .HasDatabaseName("idx_automation_conditions_rule_id");
+
+                    b.ToTable("automation_conditions", (string)null);
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationExecutionLogEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActionResults")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("action_results");
+
+                    b.Property<Guid>("AutomationRuleId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("automation_rule_id");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("int")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("error_message");
+
+                    b.Property<DateTime>("ExecutedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("executed_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TriggerSource")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("trigger_source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExecutedAt")
+                        .IsDescending()
+                        .HasDatabaseName("idx_automation_logs_executed");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("idx_automation_logs_status");
+
+                    b.HasIndex("AutomationRuleId", "ExecutedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("idx_automation_logs_rule_executed");
+
+                    b.ToTable("automation_execution_logs", (string)null);
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationRuleEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("color");
+
+                    b.Property<string>("ConditionMode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("condition_mode");
+
+                    b.Property<int>("CooldownSeconds")
+                        .HasColumnType("int")
+                        .HasColumnName("cooldown_seconds");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("ExecutionCount")
+                        .HasColumnType("int")
+                        .HasColumnName("execution_count");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("icon");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<DateTime?>("LastTriggeredAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_triggered_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("TriggerMode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("trigger_mode");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsEnabled")
+                        .HasDatabaseName("idx_automation_rules_enabled");
+
+                    b.HasIndex("Name")
+                        .HasDatabaseName("idx_automation_rules_name");
+
+                    b.ToTable("automation_rules", (string)null);
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationTriggerEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AutomationRuleId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("automation_rule_id");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("device_id");
+
+                    b.Property<int?>("OffsetMinutes")
+                        .HasColumnType("int")
+                        .HasColumnName("offset_minutes");
+
+                    b.Property<string>("Operator")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("operator");
+
+                    b.Property<string>("Property")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("property");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("SunEvent")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("sun_event");
+
+                    b.Property<string>("TimeExpression")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("time_expression");
+
+                    b.Property<string>("TriggerType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("trigger_type");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AutomationRuleId")
+                        .HasDatabaseName("idx_automation_triggers_rule_id");
+
+                    b.HasIndex("DeviceId")
+                        .HasDatabaseName("idx_automation_triggers_device_id");
+
+                    b.HasIndex("TriggerType")
+                        .HasDatabaseName("idx_automation_triggers_type");
+
+                    b.ToTable("automation_triggers", (string)null);
+                });
+
             modelBuilder.Entity("SDHome.Lib.Data.Entities.DeviceEntity", b =>
                 {
                     b.Property<string>("DeviceId")
@@ -119,6 +460,55 @@ namespace SDHome.Lib.Data.Migrations
                         .HasDatabaseName("idx_devices_zone_id");
 
                     b.ToTable("devices", (string)null);
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.SceneEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DeviceStates")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("device_states");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("icon");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .HasDatabaseName("idx_scenes_name");
+
+                    b.ToTable("scenes", (string)null);
                 });
 
             modelBuilder.Entity("SDHome.Lib.Data.Entities.SensorReadingEntity", b =>
@@ -367,6 +757,50 @@ namespace SDHome.Lib.Data.Migrations
                     b.ToTable("zones", (string)null);
                 });
 
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationActionEntity", b =>
+                {
+                    b.HasOne("SDHome.Lib.Data.Entities.AutomationRuleEntity", "AutomationRule")
+                        .WithMany("Actions")
+                        .HasForeignKey("AutomationRuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AutomationRule");
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationConditionEntity", b =>
+                {
+                    b.HasOne("SDHome.Lib.Data.Entities.AutomationRuleEntity", "AutomationRule")
+                        .WithMany("Conditions")
+                        .HasForeignKey("AutomationRuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AutomationRule");
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationExecutionLogEntity", b =>
+                {
+                    b.HasOne("SDHome.Lib.Data.Entities.AutomationRuleEntity", "AutomationRule")
+                        .WithMany("ExecutionLogs")
+                        .HasForeignKey("AutomationRuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AutomationRule");
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationTriggerEntity", b =>
+                {
+                    b.HasOne("SDHome.Lib.Data.Entities.AutomationRuleEntity", "AutomationRule")
+                        .WithMany("Triggers")
+                        .HasForeignKey("AutomationRuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AutomationRule");
+                });
+
             modelBuilder.Entity("SDHome.Lib.Data.Entities.DeviceEntity", b =>
                 {
                     b.HasOne("SDHome.Lib.Data.Entities.ZoneEntity", "Zone")
@@ -385,6 +819,17 @@ namespace SDHome.Lib.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ParentZone");
+                });
+
+            modelBuilder.Entity("SDHome.Lib.Data.Entities.AutomationRuleEntity", b =>
+                {
+                    b.Navigation("Actions");
+
+                    b.Navigation("Conditions");
+
+                    b.Navigation("ExecutionLogs");
+
+                    b.Navigation("Triggers");
                 });
 
             modelBuilder.Entity("SDHome.Lib.Data.Entities.ZoneEntity", b =>

@@ -20,15 +20,47 @@ public class ReadingsController(SignalsDbContext db) : ControllerBase
             .ToListAsync();
     }
 
+    [HttpGet("{deviceId}")]
+    public async Task<List<SensorReading>> GetReadingsForDevice(
+        string deviceId,
+        [FromQuery] int take = 500,
+        [FromQuery] int? hours = null)
+    {
+        var query = db.SensorReadings
+            .AsNoTracking()
+            .Where(e => e.DeviceId == deviceId);
+
+        if (hours.HasValue)
+        {
+            var since = DateTime.UtcNow.AddHours(-hours.Value);
+            query = query.Where(e => e.TimestampUtc >= since);
+        }
+
+        return await query
+            .OrderByDescending(e => e.TimestampUtc)
+            .Take(take)
+            .Select(e => e.ToModel())
+            .ToListAsync();
+    }
+
     [HttpGet("{deviceId}/{metric}")]
     public async Task<List<SensorReading>> GetReadingsForDeviceAndMetric(
         string deviceId,
         string metric,
-        [FromQuery] int take = 100)
+        [FromQuery] int take = 100,
+        [FromQuery] int? hours = null)
     {
-        return await db.SensorReadings
+        var query = db.SensorReadings
             .AsNoTracking()
-            .Where(e => e.DeviceId == deviceId && e.Metric == metric)
+            .Where(e => e.DeviceId == deviceId && e.Metric == metric);
+
+        if (hours.HasValue)
+        {
+            var since = DateTime.UtcNow.AddHours(-hours.Value);
+            query = query.Where(e => e.TimestampUtc >= since);
+        }
+
+        return await query
             .OrderByDescending(e => e.TimestampUtc)
             .Take(take)
             .Select(e => e.ToModel())

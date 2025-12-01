@@ -55,13 +55,15 @@ builder.Services.AddSingleton<ISignalEventMapper, SignalEventMapper>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<ISignalEventProjectionService, SignalEventProjectionService>();
 builder.Services.AddScoped<ISignalsService, SignalsService>();
+builder.Services.AddScoped<IAutomationService, AutomationService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 
 // SignalR real-time event broadcaster
 builder.Services.AddSingleton<IRealtimeEventBroadcaster, SignalREventBroadcaster>();
 
-// HttpClient for webhook calls
+// HttpClient for webhook calls (used by SignalsService and AutomationEngine)
 builder.Services.AddHttpClient<ISignalsService, SignalsService>();
+builder.Services.AddHttpClient<AutomationEngine>();
 
 // Health Checks
 builder.Services.AddHealthChecks()
@@ -83,6 +85,7 @@ if (mqttOptions?.Enabled == true)
 if (!builder.Environment.IsEnvironment("NSwag"))
 {
     builder.Services.AddHostedService<SignalsMqttWorker>();
+    builder.Services.AddHostedService<AutomationEngine>();
 }
 
 var app = builder.Build();
