@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
 using Prometheus;
@@ -28,15 +29,43 @@ public class SignalsService(
             new[] { "device" });
 
     private readonly string? _n8nWebhookUrl = webhookOptions.Value.Main;
+    
+    // Topics to skip for pipeline processing (still logged but not processed through full pipeline)
+    private static readonly string[] SkipTopicPatterns = [
+        "/set",           // Outgoing commands we send
+        "/get",           // Outgoing state requests
+        "bridge/logging", // Zigbee2MQTT internal logs
+        "bridge/state",   // Bridge online/offline status
+        "bridge/info",    // Bridge info updates
+    ];
+    
+    private static bool ShouldSkipTopic(string topic)
+    {
+        foreach (var pattern in SkipTopicPatterns)
+        {
+            if (topic.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
 
     public async Task HandleMqttMessageAsync(
         string topic,
         string payload,
         CancellationToken cancellationToken = default)
     {
+        var pipelineStart = Stopwatch.GetTimestamp();
+        
         if (string.IsNullOrWhiteSpace(payload))
         {
             Log.Warning("Received empty payload on topic {Topic}. Skipping.", topic);
+            return;
+        }
+        
+        // Skip noisy topics that don't need full pipeline processing
+        if (ShouldSkipTopic(topic))
+        {
+            Log.Debug("Skipping topic {Topic} (matches skip pattern)", topic);
             return;
         }
 
@@ -49,17 +78,23 @@ public class SignalsService(
                 ? mapper.MapArrayPayload(topic, root)
                 : mapper.Map(topic, root);
 
+            var parseTime = Stopwatch.GetElapsedTime(pipelineStart);
+
             ReceivedEventsTotal.Inc();
             ReceivedEventsByDeviceTotal.WithLabels(ev.DeviceId).Inc();
 
             // 1. Persist raw event to signal_events
+            var dbStart = Stopwatch.GetTimestamp();
             db.SignalEvents.Add(SignalEventEntity.FromModel(ev));
             await db.SaveChangesAsync(cancellationToken);
+            var dbTime = Stopwatch.GetElapsedTime(dbStart);
 
             // 2. Broadcast to real-time clients (SignalR)
+            var broadcastStart = Stopwatch.GetTimestamp();
             await realtimeBroadcaster.BroadcastSignalEventAsync(ev);
 
             // 2b. Broadcast device state update for instant UI updates
+            // Note: LinkQuality is updated by DeviceStateSyncWorker to avoid concurrency issues
             if (root.ValueKind == JsonValueKind.Object && !string.IsNullOrEmpty(ev.DeviceId))
             {
                 var stateUpdate = ExtractDeviceStateUpdate(ev.DeviceId, root);
@@ -68,18 +103,72 @@ public class SignalsService(
                     await realtimeBroadcaster.BroadcastDeviceStateUpdateAsync(stateUpdate);
                 }
             }
+            var broadcastTime = Stopwatch.GetElapsedTime(broadcastStart);
 
-            // 3. Project into specialized tables (triggers, readings, etc.)
-            var projectedData = await projectionService.ProjectAsync(ev, cancellationToken);
+            // 3. Project into specialized tables (triggers, readings, etc.) + automation processing
+            // Pass pipeline context so E2E tracker can build complete timeline
+            var pipelineContext = new PipelineContext(
+                ParseMs: parseTime.TotalMilliseconds,
+                DatabaseMs: dbTime.TotalMilliseconds,
+                BroadcastMs: broadcastTime.TotalMilliseconds
+            );
+            
+            var projectionStart = Stopwatch.GetTimestamp();
+            var projectedData = await projectionService.ProjectAsync(ev, cancellationToken, pipelineContext);
+            var projectionTime = Stopwatch.GetElapsedTime(projectionStart);
 
             // 4. Forward to webhook (n8n) if configured
+            var webhookStart = Stopwatch.GetTimestamp();
             if (!string.IsNullOrWhiteSpace(_n8nWebhookUrl))
             {
                 await SendToWebhookAsync(_n8nWebhookUrl, ev, cancellationToken);
             }
+            var webhookTime = Stopwatch.GetElapsedTime(webhookStart);
 
-            // 5. Pretty-print to console for local debugging
-            PrintPrettyEvent(ev);
+            var totalTime = Stopwatch.GetElapsedTime(pipelineStart);
+            
+            // Build and broadcast pipeline timeline for visualization
+            var timeline = new PipelineTimeline
+            {
+                DeviceId = ev.DeviceId,
+                TotalMs = totalTime.TotalMilliseconds,
+                Stages = new List<PipelineStage>
+                {
+                    new() { Name = "Parse", DurationMs = parseTime.TotalMilliseconds, StartOffsetMs = 0, Category = "signal" },
+                    new() { Name = "Database", DurationMs = dbTime.TotalMilliseconds, StartOffsetMs = parseTime.TotalMilliseconds, Category = "db" },
+                    new() { Name = "Broadcast", DurationMs = broadcastTime.TotalMilliseconds, StartOffsetMs = parseTime.TotalMilliseconds + dbTime.TotalMilliseconds, Category = "broadcast" },
+                    new() { Name = "Automation", DurationMs = projectionTime.TotalMilliseconds, StartOffsetMs = parseTime.TotalMilliseconds + dbTime.TotalMilliseconds + broadcastTime.TotalMilliseconds, Category = "automation" },
+                }
+            };
+            
+            if (!string.IsNullOrWhiteSpace(_n8nWebhookUrl))
+            {
+                timeline.Stages.Add(new PipelineStage 
+                { 
+                    Name = "Webhook", 
+                    DurationMs = webhookTime.TotalMilliseconds, 
+                    StartOffsetMs = parseTime.TotalMilliseconds + dbTime.TotalMilliseconds + broadcastTime.TotalMilliseconds + projectionTime.TotalMilliseconds, 
+                    Category = "webhook" 
+                });
+            }
+            
+            // Always broadcast timeline for visualization (even for fast signals)
+            await realtimeBroadcaster.BroadcastPipelineTimelineAsync(timeline);
+            
+            // Log timing breakdown for signals that took more than 50ms
+            if (totalTime.TotalMilliseconds > 50)
+            {
+                Log.Information(
+                    "⏱️ Signal Pipeline [{DeviceId}] Total: {Total:F1}ms | Parse: {Parse:F1}ms | DB: {Db:F1}ms | Broadcast: {Broadcast:F1}ms | Projection+Automation: {Projection:F1}ms | Webhook: {Webhook:F1}ms",
+                    ev.DeviceId,
+                    totalTime.TotalMilliseconds,
+                    parseTime.TotalMilliseconds,
+                    dbTime.TotalMilliseconds,
+                    broadcastTime.TotalMilliseconds,
+                    projectionTime.TotalMilliseconds,
+                    webhookTime.TotalMilliseconds);
+            }
+
         }
         catch (JsonException)
         {
@@ -118,31 +207,6 @@ public class SignalsService(
             State = state,
             TimestampUtc = DateTime.UtcNow
         };
-    }
-
-    private static void PrintPrettyEvent(SignalEvent ev)
-    {
-        string emoji = ev.Capability switch
-        {
-            "button"      => "🔵",
-            "temperature" => "🌡️",
-            "motion"      => "🏃",
-            _             => "📡"
-        };
-
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"{emoji} {ev.Capability}/{ev.EventType}/{ev.EventSubType} from {ev.DeviceId}");
-        Console.ResetColor();
-
-        string prettyJson = JsonSerializer.Serialize(ev, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
-
-        Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine(prettyJson);
-        Console.ResetColor();
-        Console.WriteLine();
     }
 
     private async Task SendToWebhookAsync(

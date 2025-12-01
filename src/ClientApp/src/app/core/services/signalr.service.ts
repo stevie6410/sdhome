@@ -56,6 +56,50 @@ export interface DeviceStateUpdate {
   timestampUtc: string;
 }
 
+export type AutomationLogLevel = 'Debug' | 'Info' | 'Warning' | 'Success' | 'Error';
+export type AutomationLogPhase =
+  | 'TriggerReceived'
+  | 'TriggerEvaluating'
+  | 'TriggerMatched'
+  | 'TriggerSkipped'
+  | 'ConditionEvaluating'
+  | 'ConditionPassed'
+  | 'ConditionFailed'
+  | 'CooldownActive'
+  | 'ActionExecuting'
+  | 'ActionCompleted'
+  | 'ActionFailed'
+  | 'ExecutionCompleted'
+  | 'ExecutionFailed';
+
+export interface AutomationLogEntry {
+  automationId: string;
+  automationName: string;
+  level: AutomationLogLevel;
+  phase: AutomationLogPhase;
+  message: string;
+  details?: Record<string, any>;
+  timestampUtc: string;
+  durationMs?: number;
+}
+
+export interface PipelineStage {
+  name: string;
+  durationMs: number;
+  startOffsetMs: number;
+  category: 'signal' | 'db' | 'broadcast' | 'automation' | 'mqtt' | 'webhook' | 'other';
+  isSuccess: boolean;
+}
+
+export interface PipelineTimeline {
+  id: string;
+  deviceId: string;
+  automationName?: string;
+  timestampUtc: string;
+  totalMs: number;
+  stages: PipelineStage[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -73,6 +117,9 @@ export class SignalRService {
   private _deviceSyncProgress = signal<DeviceSyncProgress | null>(null);
   private _devicePairingProgress = signal<DevicePairingProgress | null>(null);
   private _deviceStateUpdates = signal<Map<string, DeviceStateUpdate>>(new Map());
+  private _automationLogs = signal<AutomationLogEntry[]>([]);
+  private _automationLogsByAutomation = signal<Map<string, AutomationLogEntry[]>>(new Map());
+  private _pipelineTimelines = signal<PipelineTimeline[]>([]);
 
   // Public readable signals
   readonly connectionState = this._connectionState.asReadonly();
@@ -85,6 +132,9 @@ export class SignalRService {
   readonly deviceSyncProgress = this._deviceSyncProgress.asReadonly();
   readonly devicePairingProgress = this._devicePairingProgress.asReadonly();
   readonly deviceStateUpdates = this._deviceStateUpdates.asReadonly();
+  readonly automationLogs = this._automationLogs.asReadonly();
+  readonly automationLogsByAutomation = this._automationLogsByAutomation.asReadonly();
+  readonly pipelineTimelines = this._pipelineTimelines.asReadonly();
 
   // Computed values
   readonly isConnected = computed(() => this._connectionState() === 'connected');
@@ -183,6 +233,36 @@ export class SignalRService {
         const newMap = new Map(map);
         newMap.set(data.deviceId, data);
         return newMap;
+      });
+    });
+
+    // Automation log handler - for automation console monitoring
+    this.hubConnection.on('AutomationLog', (data: AutomationLogEntry) => {
+      console.log('Automation log:', data.automationName, data.phase, data.message);
+
+      // Add to global logs
+      this._automationLogs.update(logs => {
+        const updated = [data, ...logs];
+        return updated.slice(0, this.maxHistorySize);
+      });
+
+      // Add to automation-specific logs
+      this._automationLogsByAutomation.update(map => {
+        const newMap = new Map(map);
+        const existing = newMap.get(data.automationId) || [];
+        const updated = [data, ...existing].slice(0, this.maxHistorySize);
+        newMap.set(data.automationId, updated);
+        return newMap;
+      });
+    });
+
+    // Pipeline timeline handler - for latency visualization
+    this.hubConnection.on('PipelineTimeline', (data: PipelineTimeline) => {
+      console.log('Pipeline timeline:', data.deviceId, `${data.totalMs}ms`, data.stages.length, 'stages');
+
+      this._pipelineTimelines.update(timelines => {
+        const updated = [data, ...timelines];
+        return updated.slice(0, this.maxHistorySize);
       });
     });
   }
@@ -298,6 +378,63 @@ export class SignalRService {
     if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
       await this.hubConnection.invoke('UnsubscribeFromPairing', pairingId);
     }
+  }
+
+  async subscribeToAutomation(automationId: string): Promise<void> {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      await this.hubConnection.invoke('SubscribeToAutomation', automationId);
+    }
+  }
+
+  async unsubscribeFromAutomation(automationId: string): Promise<void> {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      await this.hubConnection.invoke('UnsubscribeFromAutomation', automationId);
+    }
+  }
+
+  async subscribeToAllAutomations(): Promise<void> {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      await this.hubConnection.invoke('SubscribeToAllAutomations');
+    }
+  }
+
+  async unsubscribeFromAllAutomations(): Promise<void> {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      await this.hubConnection.invoke('UnsubscribeFromAllAutomations');
+    }
+  }
+
+  getAutomationLogs(automationId: string): AutomationLogEntry[] {
+    return this._automationLogsByAutomation().get(automationId) || [];
+  }
+
+  clearAutomationLogs(automationId?: string): void {
+    if (automationId) {
+      this._automationLogsByAutomation.update(map => {
+        const newMap = new Map(map);
+        newMap.delete(automationId);
+        return newMap;
+      });
+    } else {
+      this._automationLogs.set([]);
+      this._automationLogsByAutomation.set(new Map());
+    }
+  }
+
+  async subscribeToPipelineTimelines(): Promise<void> {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      await this.hubConnection.invoke('SubscribeToPipelineTimelines');
+    }
+  }
+
+  async unsubscribeFromPipelineTimelines(): Promise<void> {
+    if (this.hubConnection?.state === signalR.HubConnectionState.Connected) {
+      await this.hubConnection.invoke('UnsubscribeFromPipelineTimelines');
+    }
+  }
+
+  clearPipelineTimelines(): void {
+    this._pipelineTimelines.set([]);
   }
 
   setMaxHistorySize(size: number): void {

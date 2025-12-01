@@ -6,7 +6,9 @@ namespace SDHome.Api.Controllers;
 
 [ApiController]
 [Route("/api/automations")]
-public class AutomationsController(IAutomationService automationService) : ControllerBase
+public class AutomationsController(
+    IAutomationService automationService,
+    IEndToEndLatencyTracker e2eTracker) : ControllerBase
 {
     // ===== Automation Rules =====
     
@@ -43,10 +45,18 @@ public class AutomationsController(IAutomationService automationService) : Contr
     /// Create a new automation rule
     /// </summary>
     [HttpPost]
+    [ProducesResponseType(typeof(AutomationRule), StatusCodes.Status200OK)]
     public async Task<ActionResult<AutomationRule>> CreateAutomation([FromBody] CreateAutomationRequest request)
     {
-        var automation = await automationService.CreateAutomationAsync(request);
-        return CreatedAtAction(nameof(GetAutomation), new { id = automation.Id }, automation);
+        try
+        {
+            var automation = await automationService.CreateAutomationAsync(request);
+            return Ok(automation);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+        }
     }
     
     /// <summary>
@@ -133,6 +143,26 @@ public class AutomationsController(IAutomationService automationService) : Contr
     public async Task<List<AutomationExecutionLog>> GetAutomationLogs(Guid id, [FromQuery] int take = 50)
     {
         return await automationService.GetExecutionLogsAsync(id, take);
+    }
+    
+    // ===== End-to-End Latency Tracking =====
+    
+    /// <summary>
+    /// Get end-to-end latency timelines (completed automation cycles)
+    /// </summary>
+    [HttpGet("e2e/completed")]
+    public ActionResult<IEnumerable<EndToEndTimeline>> GetCompletedTimelines([FromQuery] int take = 20)
+    {
+        return Ok(e2eTracker.GetCompletedTimelines(take));
+    }
+    
+    /// <summary>
+    /// Get pending (in-progress) automation cycles
+    /// </summary>
+    [HttpGet("e2e/pending")]
+    public ActionResult<IEnumerable<EndToEndTimeline>> GetPendingTimelines()
+    {
+        return Ok(e2eTracker.GetPendingTimelines());
     }
 }
 

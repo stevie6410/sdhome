@@ -82,6 +82,33 @@ public class DevicesController(IDeviceService deviceService, IRealtimeEventBroad
     }
 
     /// <summary>
+    /// Get current device state directly from the device.
+    /// This actively requests the state from Zigbee2MQTT rather than relying on cached/retained messages.
+    /// Use this to ensure you have the most accurate current state.
+    /// </summary>
+    [HttpGet("{deviceId}/state")]
+    public async Task<ActionResult<Dictionary<string, object?>>> GetDeviceState(string deviceId)
+    {
+        try
+        {
+            var state = await _deviceService.GetDeviceStateAsync(deviceId);
+            return Ok(new { 
+                deviceId, 
+                state, 
+                timestamp = DateTime.UtcNow 
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Failed to get device state", details = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Update device attributes (room, device type, etc.)
     /// </summary>
     [HttpPut("{deviceId}")]
@@ -252,6 +279,31 @@ public class DevicesController(IDeviceService deviceService, IRealtimeEventBroad
     {
         var isActive = await _deviceService.IsPairingActiveAsync();
         return Ok(new { isActive });
+    }
+
+    /// <summary>
+    /// Get Zigbee network map for visualization
+    /// </summary>
+    [HttpGet("network-map")]
+    public async Task<ActionResult<ZigbeeNetworkMap>> GetNetworkMap()
+    {
+        try
+        {
+            var networkMap = await _deviceService.GetNetworkMapAsync();
+            return Ok(networkMap);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (TimeoutException)
+        {
+            return StatusCode(504, new { error = "Timeout waiting for network map from Zigbee2MQTT" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = "Failed to get network map", details = ex.Message });
+        }
     }
 }
 

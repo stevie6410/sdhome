@@ -168,6 +168,18 @@
         <section class="card actions-card primary-actions">
           <div class="card-header">
             <h2>🎮 Quick Actions</h2>
+            <button 
+              class="btn btn-secondary btn-sm refresh-state-btn" 
+              (click)="refreshDeviceState()" 
+              [disabled]="refreshingState()"
+              title="Refresh device state from Zigbee2MQTT"
+            >
+              @if (refreshingState()) {
+                <span class="spinner-sm"></span> Refreshing...
+              } @else {
+                🔄 Refresh State
+              }
+            </button>
           </div>
           <div class="card-body">
             <div class="quick-actions-grid">

@@ -1,6 +1,6 @@
 .automation-editor {
   min-height: 100vh;
-  background: var(--surface-bg);
+  background: var(--bg-dark);
 }
 
 .editor-header {
@@ -8,8 +8,11 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-md) var(--spacing-xl);
-  background: var(--surface-0);
-  border-bottom: 1px solid var(--border-primary);
+  background: rgba(13, 17, 23, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(34, 197, 94, 0.15);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -23,6 +26,7 @@
       font-size: 1.25rem;
       font-weight: 600;
       margin: 0;
+      color: var(--text-primary);
     }
   }
 
@@ -73,8 +77,10 @@
 }
 
 .editor-section {
-  background: var(--surface-0);
-  border: 1px solid var(--border-primary);
+  background: rgba(13, 17, 23, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(230, 237, 243, 0.08);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
 }
@@ -135,7 +141,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--accent-cyan);
+    border-color: var(--accent-primary);
   }
 
   &.small {
@@ -163,7 +169,7 @@ textarea.form-input {
 
   &:focus {
     outline: none;
-    border-color: var(--accent-cyan);
+    border-color: var(--accent-primary);
   }
 
   &.small {
@@ -210,8 +216,8 @@ textarea.form-input {
   }
 
   &.selected {
-    border-color: var(--accent-cyan);
-    background: rgba(0, 245, 255, 0.1);
+    border-color: var(--accent-primary);
+    background: rgba(34, 197, 94, 0.1);
   }
 }
 
@@ -235,7 +241,7 @@ textarea.form-input {
 
   &.selected {
     border-color: var(--text-primary);
-    box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px currentColor;
+    box-shadow: 0 0 0 2px var(--bg-dark), 0 0 0 4px currentColor;
   }
 }
 
@@ -280,7 +286,7 @@ textarea.form-input {
   }
 
   input:checked + .switch {
-    background: var(--accent-cyan);
+    background: var(--accent-dim);
 
     &::after {
       left: 20px;
@@ -373,7 +379,7 @@ textarea.form-input {
   width: 100%;
   padding: var(--spacing-sm);
   background: transparent;
-  border: 2px dashed var(--border-secondary);
+  border: 1px dashed var(--border-secondary);
   border-radius: var(--radius-md);
   color: var(--text-muted);
   font-size: 0.875rem;
@@ -381,9 +387,9 @@ textarea.form-input {
   transition: all var(--transition-fast);
 
   &:hover {
-    border-color: var(--accent-cyan);
-    color: var(--accent-cyan);
-    background: rgba(0, 245, 255, 0.05);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    background: rgba(34, 197, 94, 0.05);
   }
 }
 
@@ -395,7 +401,7 @@ textarea.form-input {
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-lg);
   border-radius: var(--radius-md);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -408,22 +414,25 @@ textarea.form-input {
 }
 
 .btn-primary {
-  background: var(--accent-cyan);
-  color: var(--text-inverse);
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 
   &:hover:not(:disabled) {
-    filter: brightness(1.1);
+    background: linear-gradient(135deg, #059669, #047857);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    transform: translateY(-1px);
   }
 }
 
 .btn-secondary {
-  background: var(--surface-1);
+  background: rgba(22, 27, 34, 0.95);
   color: var(--text-primary);
-  border: 1px solid var(--border-secondary);
+  border: 1px solid rgba(230, 237, 243, 0.15);
 
   &:hover:not(:disabled) {
-    background: var(--surface-2);
-    border-color: var(--accent-cyan);
+    background: rgba(33, 38, 45, 0.95);
+    border-color: rgba(34, 197, 94, 0.3);
   }
 }
 
@@ -540,13 +549,13 @@ textarea.form-input {
   transition: all var(--transition-fast);
 
   &:hover {
-    border-color: var(--accent-cyan);
+    border-color: var(--accent-primary);
     color: var(--text-primary);
   }
 
   &.selected {
-    background: var(--accent-cyan);
-    border-color: var(--accent-cyan);
+    background: var(--accent-dim);
+    border-color: var(--accent-dim);
     color: var(--text-inverse);
   }
 }
@@ -606,7 +615,7 @@ textarea.form-input {
       width: 18px;
       height: 18px;
       border-radius: 50%;
-      background: var(--accent-cyan);
+      background: var(--accent-primary);
       cursor: pointer;
       transition: transform var(--transition-fast);
 
@@ -619,7 +628,7 @@ textarea.form-input {
       width: 18px;
       height: 18px;
       border-radius: 50%;
-      background: var(--accent-cyan);
+      background: var(--accent-primary);
       cursor: pointer;
       border: none;
     }
@@ -672,7 +681,7 @@ textarea.form-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent-cyan);
+  background: var(--accent-dim);
   color: var(--text-inverse);
   border-radius: 50%;
   font-size: 0.75rem;
@@ -682,7 +691,7 @@ textarea.form-input {
 
 /* Section styling */
 .triggers-section {
-  border-color: var(--accent-purple);
+  border-color: rgba(139, 92, 246, 0.3);
 
   .section-title {
     color: var(--accent-purple);
@@ -690,7 +699,7 @@ textarea.form-input {
 }
 
 .conditions-section {
-  border-color: var(--accent-amber);
+  border-color: rgba(251, 191, 36, 0.3);
 
   .section-title {
     color: var(--accent-amber);
@@ -698,9 +707,52 @@ textarea.form-input {
 }
 
 .actions-section {
-  border-color: var(--accent-cyan);
+  border-color: rgba(34, 197, 94, 0.3);
 
   .section-title {
-    color: var(--accent-cyan);
+    color: var(--accent-primary);
+  }
+}
+
+/* Console section */
+.console-section {
+  border-color: rgba(59, 130, 246, 0.3);
+
+  .section-title {
+    color: #3b82f6;
+  }
+
+  .section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+  }
+
+  .toggle-btn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: var(--surface-1);
+      border-color: var(--accent-primary);
+      color: var(--text-primary);
+    }
+  }
+
+  .console-wrapper {
+    height: 300px;
+  }
+}
+
+.pipeline-section {
+  .pipeline-wrapper {
+    height: 350px;
   }
 }

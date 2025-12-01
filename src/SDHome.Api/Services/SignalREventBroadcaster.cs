@@ -146,4 +146,49 @@ public class SignalREventBroadcaster(
             logger.LogError(ex, "Failed to broadcast device state update");
         }
     }
+
+    public async Task BroadcastAutomationLogAsync(AutomationLogEntry logEntry)
+    {
+        try
+        {
+            // Broadcast to automation-specific group for targeted monitoring
+            await hubContext.Clients.Group($"automation:{logEntry.AutomationId}")
+                .SendAsync("AutomationLog", logEntry);
+            
+            // Also broadcast to "all automations" group for dashboard view
+            await hubContext.Clients.Group("automations:all")
+                .SendAsync("AutomationLog", logEntry);
+            
+            logger.LogDebug("Broadcasted automation log: [{Level}] {Phase} - {Message} for automation {AutomationId}", 
+                logEntry.Level, logEntry.Phase, logEntry.Message, logEntry.AutomationId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to broadcast automation log");
+        }
+    }
+
+    public async Task BroadcastPipelineTimelineAsync(PipelineTimeline timeline)
+    {
+        try
+        {
+            // Broadcast to all clients watching timelines
+            await hubContext.Clients.Group("pipelines:all")
+                .SendAsync("PipelineTimeline", timeline);
+            
+            // Also broadcast to device-specific group
+            if (!string.IsNullOrEmpty(timeline.DeviceId))
+            {
+                await hubContext.Clients.Group($"device:{timeline.DeviceId}")
+                    .SendAsync("PipelineTimeline", timeline);
+            }
+            
+            logger.LogDebug("Broadcasted pipeline timeline: {DeviceId} - {TotalMs:F1}ms ({StageCount} stages)", 
+                timeline.DeviceId, timeline.TotalMs, timeline.Stages.Count);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to broadcast pipeline timeline");
+        }
+    }
 }

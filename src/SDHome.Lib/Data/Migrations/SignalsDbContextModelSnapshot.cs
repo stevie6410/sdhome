@@ -415,6 +415,9 @@ namespace SDHome.Lib.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("last_seen");
 
+                    b.Property<int?>("LinkQuality")
+                        .HasColumnType("int");
+
                     b.Property<string>("Manufacturer")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")

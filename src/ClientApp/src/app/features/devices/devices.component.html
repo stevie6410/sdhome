@@ -81,6 +81,9 @@
     </div>
 
     <div class="actions">
+      <a routerLink="/devices/network-map" class="btn btn-info">
+        🕸️ Network Map
+      </a>
       <button class="btn btn-accent" (click)="openPairingDialog()">
         📡 Pair Device
       </button>
@@ -143,11 +146,18 @@
                   <div class="device-info">
                     <h3 class="device-name">{{ getDisplayName(device) }}</h3>
                     <p class="device-model">{{ device.manufacturer }} {{ device.modelId }}</p>
-                    @if (device.deviceType !== undefined) {
-                      <span class="device-type-badge" [ngClass]="'type-' + getDeviceTypeClass(device.deviceType)">
-                        {{ getDeviceTypeName(device.deviceType) }}
-                      </span>
-                    }
+                    <div class="device-badges">
+                      @if (device.deviceType !== undefined) {
+                        <span class="device-type-badge" [ngClass]="'type-' + getDeviceTypeClass(device.deviceType)">
+                          {{ getDeviceTypeName(device.deviceType) }}
+                        </span>
+                      }
+                      @if (device.linkQuality != null) {
+                        <span class="lqi-badge" [ngClass]="getLqiClass(device.linkQuality)" [title]="'Link Quality: ' + device.linkQuality + '/255'">
+                          📶 {{ device.linkQuality }}
+                        </span>
+                      }
+                    </div>
                   </div>
                 </div>
                 <div class="card-actions">

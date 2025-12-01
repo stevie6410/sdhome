@@ -344,6 +344,17 @@ export class DevicesComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Get CSS class for link quality indicator
+   * @param lqi Link quality value (0-255)
+   */
+  getLqiClass(lqi: number): string {
+    if (lqi >= 150) return 'lqi-good';
+    if (lqi >= 80) return 'lqi-medium';
+    if (lqi >= 30) return 'lqi-poor';
+    return 'lqi-critical';
+  }
+
   openPairingDialog() {
     this.showPairingDialog.set(true);
   }

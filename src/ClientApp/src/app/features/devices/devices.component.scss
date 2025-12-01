@@ -274,6 +274,22 @@
     }
   }
 
+  &.btn-info {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    &:hover:not(:disabled) {
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+      transform: translateY(-1px);
+    }
+  }
+
   &.btn-text {
     background: transparent;
     color: var(--text-secondary);
@@ -521,6 +537,37 @@
       &.type-secondary {
         background: var(--surface-3);
         color: var(--text-secondary);
+      }
+    }
+
+    .lqi-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      letter-spacing: 0.5px;
+
+      &.lqi-excellent {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--success);
+      }
+
+      &.lqi-good {
+        background: rgba(132, 204, 22, 0.15);
+        color: #84cc16;
+      }
+
+      &.lqi-fair {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--warning);
+      }
+
+      &.lqi-poor {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--danger);
       }
     }
   }

@@ -69,6 +69,12 @@ public class Device
     public Dictionary<string, object> Attributes { get; set; } = new();
     public DateTime? LastSeen { get; set; }
     public bool IsAvailable { get; set; }
+    
+    /// <summary>
+    /// Zigbee link quality indicator (0-255). Higher is better.
+    /// Updated from MQTT state messages.
+    /// </summary>
+    public int? LinkQuality { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

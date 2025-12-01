@@ -7,39 +7,43 @@ namespace SDHome.Lib.Services;
 
 public class SignalEventProjectionService(
     SignalsDbContext db,
-    IRealtimeEventBroadcaster broadcaster) : ISignalEventProjectionService
+    IRealtimeEventBroadcaster broadcaster,
+    IAutomationEngine automationEngine) : ISignalEventProjectionService
 {
-    public async Task<ProjectedEventData> ProjectAsync(SignalEvent ev, CancellationToken cancellationToken = default)
+    public async Task<ProjectedEventData> ProjectAsync(
+        SignalEvent ev, 
+        CancellationToken cancellationToken = default,
+        PipelineContext? pipelineContext = null)
     {
         // Handle motion sensor events
         if (ev.Capability == "motion" && ev.EventType == "detection")
         {
-            return await HandleMotionEventAsync(ev, cancellationToken);
+            return await HandleMotionEventAsync(ev, cancellationToken, pipelineContext);
         }
 
         // Handle button presses (triggers)
         if (ev.Capability == "button" && ev.EventType == "press")
         {
-            return await HandleButtonEventAsync(ev, cancellationToken);
+            return await HandleButtonEventAsync(ev, cancellationToken, pipelineContext);
         }
 
         // Handle temperature sensors (readings)
         if (ev.Capability == "temperature" && ev.EventType == "measurement")
         {
-            return await HandleTemperatureEventAsync(ev, cancellationToken);
+            return await HandleTemperatureEventAsync(ev, cancellationToken, pipelineContext);
         }
 
         // Handle contact sensors (triggers)
         if (ev.Capability == "contact")
         {
-            return await HandleContactEventAsync(ev, cancellationToken);
+            return await HandleContactEventAsync(ev, cancellationToken, pipelineContext);
         }
 
         // Handle generic sensor readings from any device with numeric values
-        return await HandleGenericSensorReadingsAsync(ev, cancellationToken);
+        return await HandleGenericSensorReadingsAsync(ev, cancellationToken, pipelineContext);
     }
 
-    private async Task<ProjectedEventData> HandleButtonEventAsync(SignalEvent ev, CancellationToken ct)
+    private async Task<ProjectedEventData> HandleButtonEventAsync(SignalEvent ev, CancellationToken ct, PipelineContext? pipelineContext = null)
     {
         var payload = ev.RawPayload;
 
@@ -73,10 +77,28 @@ public class SignalEventProjectionService(
             await broadcaster.BroadcastSensorReadingAsync(reading);
         }
 
+        // Notify automation engine of the trigger event (TriggerEvent type automations)
+        await automationEngine.ProcessTriggerEventAsync(trigger, pipelineContext);
+        
+        // Also notify as device state change so DeviceState type automations work
+        // This allows automations with trigger "DeviceState" + property "action" to fire on button presses
+        await automationEngine.ProcessDeviceStateChangeAsync(
+            ev.DeviceId, 
+            "action", 
+            null, 
+            ev.EventSubType, // "single", "double", "hold", etc.
+            pipelineContext);
+        
+        // Notify automation engine of any sensor readings
+        foreach (var reading in readings)
+        {
+            await automationEngine.ProcessSensorReadingAsync(reading, pipelineContext);
+        }
+
         return new ProjectedEventData(trigger, readings);
     }
 
-    private async Task<ProjectedEventData> HandleTemperatureEventAsync(SignalEvent ev, CancellationToken ct)
+    private async Task<ProjectedEventData> HandleTemperatureEventAsync(SignalEvent ev, CancellationToken ct, PipelineContext? pipelineContext = null)
     {
         var payload = ev.RawPayload;
         var readings = new List<SensorReading>();
@@ -139,10 +161,16 @@ public class SignalEventProjectionService(
             await broadcaster.BroadcastSensorReadingAsync(reading);
         }
 
+        // Notify automation engine of sensor readings
+        foreach (var reading in readings)
+        {
+            await automationEngine.ProcessSensorReadingAsync(reading, pipelineContext);
+        }
+
         return new ProjectedEventData(null, readings);
     }
 
-    private async Task<ProjectedEventData> HandleContactEventAsync(SignalEvent ev, CancellationToken ct)
+    private async Task<ProjectedEventData> HandleContactEventAsync(SignalEvent ev, CancellationToken ct, PipelineContext? pipelineContext = null)
     {
         var payload = ev.RawPayload;
 
@@ -176,10 +204,19 @@ public class SignalEventProjectionService(
             await broadcaster.BroadcastSensorReadingAsync(reading);
         }
 
+        // Notify automation engine of the trigger event
+        await automationEngine.ProcessTriggerEventAsync(trigger, pipelineContext);
+        
+        // Notify automation engine of any sensor readings
+        foreach (var reading in readings)
+        {
+            await automationEngine.ProcessSensorReadingAsync(reading, pipelineContext);
+        }
+
         return new ProjectedEventData(trigger, readings);
     }
 
-    private async Task<ProjectedEventData> HandleGenericSensorReadingsAsync(SignalEvent ev, CancellationToken ct)
+    private async Task<ProjectedEventData> HandleGenericSensorReadingsAsync(SignalEvent ev, CancellationToken ct, PipelineContext? pipelineContext = null)
     {
         // For any other event, try to extract common sensor readings
         var readings = ExtractCommonSensorReadings(ev);
@@ -272,6 +309,31 @@ public class SignalEventProjectionService(
             {
                 await broadcaster.BroadcastSensorReadingAsync(reading);
             }
+
+            // Notify automation engine of the trigger event
+            if (trigger != null)
+            {
+                await automationEngine.ProcessTriggerEventAsync(trigger, pipelineContext);
+                
+                // Also notify as device state change for "state" property
+                // This updates the cached state for toggle operations
+                if (trigger.TriggerType == "state")
+                {
+                    await automationEngine.ProcessDeviceStateChangeAsync(
+                        ev.DeviceId,
+                        "state",
+                        null,
+                        trigger.TriggerSubType?.ToUpper(), // "ON" or "OFF"
+                        pipelineContext
+                    );
+                }
+            }
+            
+            // Notify automation engine of any sensor readings
+            foreach (var reading in readings)
+            {
+                await automationEngine.ProcessSensorReadingAsync(reading, pipelineContext);
+            }
         }
 
         return new ProjectedEventData(trigger, readings);
@@ -327,7 +389,7 @@ public class SignalEventProjectionService(
         return readings;
     }
 
-    private async Task<ProjectedEventData> HandleMotionEventAsync(SignalEvent ev, CancellationToken ct)
+    private async Task<ProjectedEventData> HandleMotionEventAsync(SignalEvent ev, CancellationToken ct, PipelineContext? pipelineContext = null)
     {
         var payload = ev.RawPayload;
 
@@ -392,6 +454,15 @@ public class SignalEventProjectionService(
         foreach (var reading in readings)
         {
             await broadcaster.BroadcastSensorReadingAsync(reading);
+        }
+
+        // Notify automation engine of the trigger event
+        await automationEngine.ProcessTriggerEventAsync(trigger, pipelineContext);
+        
+        // Notify automation engine of any sensor readings
+        foreach (var reading in readings)
+        {
+            await automationEngine.ProcessSensorReadingAsync(reading, pipelineContext);
         }
 
         return new ProjectedEventData(trigger, readings);

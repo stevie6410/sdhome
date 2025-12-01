@@ -22,6 +22,8 @@ import {
   DeviceCapability,
   ControlType,
 } from '../../../api/sdhome-client';
+import { AutomationConsoleComponent } from '../automation-console/automation-console.component';
+import { PipelineTimelineComponent } from '../pipeline-timeline/pipeline-timeline.component';
 
 interface CachedDeviceDefinition {
   definition: DeviceDefinition;
@@ -48,7 +50,7 @@ interface PropertyOption {
 @Component({
   selector: 'app-automation-editor',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, AutomationConsoleComponent, PipelineTimelineComponent],
   templateUrl: './automation-editor.component.html',
   styleUrl: './automation-editor.component.scss',
 })
@@ -90,6 +92,10 @@ export class AutomationEditorComponent implements OnInit {
   triggers = signal<TriggerFormItem[]>([]);
   conditions = signal<ConditionFormItem[]>([]);
   actions = signal<ActionFormItem[]>([]);
+
+  // Console visibility
+  showConsole = signal(true);
+  showPipelineTimeline = signal(false);
 
   // Icon options
   iconOptions = ['⚡', '💡', '🌡️', '🔔', '🏠', '🌙', '☀️', '🎬', '🔒', '🚪', '💨', '🎵'];
@@ -133,22 +139,34 @@ export class AutomationEditorComponent implements OnInit {
   }
 
   // Load device definition with capabilities
-  async loadDeviceDefinition(deviceId: string): Promise<CachedDeviceDefinition | null> {
-    if (!deviceId) return null;
+  loadDeviceDefinition(deviceId: string): void {
+    if (!deviceId) return;
 
     // Check cache first
     const cached = this.deviceDefinitions().get(deviceId);
-    if (cached) return cached;
+    if (cached) return;
 
     // Check if already loading
-    if (this.loadingDefinitions().has(deviceId)) return null;
+    if (this.loadingDefinitions().has(deviceId)) return;
+
+    // Use setTimeout to defer signal updates outside of template rendering
+    setTimeout(() => {
+      this.loadDeviceDefinitionAsync(deviceId);
+    }, 0);
+  }
+
+  // Async method to actually load the definition
+  private async loadDeviceDefinitionAsync(deviceId: string): Promise<void> {
+    // Double-check cache (might have loaded while waiting)
+    if (this.deviceDefinitions().get(deviceId)) return;
+    if (this.loadingDefinitions().has(deviceId)) return;
 
     // Mark as loading
     this.loadingDefinitions.update((set) => new Set(set).add(deviceId));
 
     try {
       const definition = await this.devicesService.getDeviceDefinition(deviceId).toPromise();
-      if (!definition) return null;
+      if (!definition) return;
 
       const capabilities = definition.capabilities || [];
       const propertyOptions = this.extractPropertyOptions(capabilities);
@@ -165,11 +183,8 @@ export class AutomationEditorComponent implements OnInit {
         newMap.set(deviceId, cached);
         return newMap;
       });
-
-      return cached;
     } catch (error) {
       console.error(`Error loading device definition for ${deviceId}:`, error);
-      return null;
     } finally {
       this.loadingDefinitions.update((set) => {
         const newSet = new Set(set);
@@ -267,9 +282,9 @@ export class AutomationEditorComponent implements OnInit {
   }
 
   // Handle device selection change - load its definition
-  async onDeviceSelected(deviceId: string) {
+  onDeviceSelected(deviceId: string) {
     if (deviceId) {
-      await this.loadDeviceDefinition(deviceId);
+      this.loadDeviceDefinition(deviceId);
     }
   }
 
@@ -308,6 +323,8 @@ export class AutomationEditorComponent implements OnInit {
     try {
       const automation = await this.automationsService.getAutomation(id).toPromise();
       if (automation) {
+        // Preload device definitions for all devices used in this automation
+        await this.preloadDeviceDefinitions(automation);
         this.populateForm(automation);
       }
     } catch (error) {
@@ -316,6 +333,38 @@ export class AutomationEditorComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  // Preload device definitions for all devices in an automation
+  private async preloadDeviceDefinitions(automation: AutomationRule): Promise<void> {
+    const deviceIds = new Set<string>();
+
+    // Collect device IDs from triggers, conditions, and actions
+    automation.triggers?.forEach(t => { if (t.deviceId) deviceIds.add(t.deviceId); });
+    automation.conditions?.forEach(c => { if (c.deviceId) deviceIds.add(c.deviceId); });
+    automation.actions?.forEach(a => { if (a.deviceId) deviceIds.add(a.deviceId); });
+
+    // Load all device definitions in parallel
+    const loadPromises = Array.from(deviceIds).map(async (deviceId) => {
+      try {
+        const definition = await this.devicesService.getDeviceDefinition(deviceId).toPromise();
+        if (definition) {
+          const capabilities = definition.capabilities || [];
+          const propertyOptions = this.extractPropertyOptions(capabilities);
+          const cached: CachedDeviceDefinition = { definition, capabilities, propertyOptions };
+
+          this.deviceDefinitions.update((map) => {
+            const newMap = new Map(map);
+            newMap.set(deviceId, cached);
+            return newMap;
+          });
+        }
+      } catch (error) {
+        console.error(`Error preloading device definition for ${deviceId}:`, error);
+      }
+    });
+
+    await Promise.all(loadPromises);
   }
 
   populateForm(automation: AutomationRule) {
@@ -638,6 +687,66 @@ export class AutomationEditorComponent implements OnInit {
 
   cancel() {
     this.router.navigate(['/automations']);
+  }
+
+  copyToJson() {
+    const automationData = {
+      name: this.name(),
+      description: this.description() || null,
+      icon: this.icon(),
+      color: this.color(),
+      isEnabled: this.isEnabled(),
+      triggerMode: TriggerMode[this.triggerMode()],
+      conditionMode: ConditionMode[this.conditionMode()],
+      cooldownSeconds: this.cooldownSeconds(),
+      triggers: this.triggers().map((t, i) => ({
+        triggerType: TriggerType[t.triggerType],
+        deviceId: t.deviceId || null,
+        property: t.property || null,
+        operator: t.operator ? ComparisonOperator[t.operator] : null,
+        value: t.value || null,
+        timeExpression: t.timeExpression || null,
+        sunEvent: t.sunEvent || null,
+        offsetMinutes: t.offsetMinutes || null,
+        sortOrder: i,
+      })),
+      conditions: this.conditions().map((c, i) => ({
+        conditionType: ConditionType[c.conditionType],
+        deviceId: c.deviceId || null,
+        property: c.property || null,
+        operator: c.operator ? ComparisonOperator[c.operator] : null,
+        value: c.value || null,
+        value2: c.value2 || null,
+        timeStart: c.timeStart || null,
+        timeEnd: c.timeEnd || null,
+        daysOfWeek: c.daysOfWeek.length > 0 ? c.daysOfWeek : null,
+        sortOrder: i,
+      })),
+      actions: this.actions().map((a, i) => ({
+        actionType: ActionType[a.actionType],
+        deviceId: a.deviceId || null,
+        property: a.property || null,
+        value: a.value || null,
+        delaySeconds: a.delaySeconds || null,
+        webhookUrl: a.webhookUrl || null,
+        webhookMethod: a.webhookMethod || null,
+        webhookBody: a.webhookBody || null,
+        notificationTitle: a.notificationTitle || null,
+        notificationMessage: a.notificationMessage || null,
+        sceneId: a.sceneId || null,
+        sortOrder: i,
+      })),
+    };
+
+    const json = JSON.stringify(automationData, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      alert('Automation JSON copied to clipboard!');
+    }).catch((err) => {
+      console.error('Failed to copy:', err);
+      // Fallback: show in console
+      console.log('Automation JSON:', json);
+      alert('Failed to copy to clipboard. Check console for JSON.');
+    });
   }
 }
 

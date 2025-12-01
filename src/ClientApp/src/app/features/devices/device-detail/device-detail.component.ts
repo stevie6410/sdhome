@@ -42,6 +42,7 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
   definition = signal<DeviceDefinition | null>(null);
   loading = signal(false);
   loadingDefinition = signal(false);
+  refreshingState = signal(false);
   saving = signal(false);
   error = signal<string | null>(null);
 
@@ -335,11 +336,45 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
     try {
       const def = await this.apiService.getDeviceDefinition(this.deviceId()).toPromise();
       this.definition.set(def ?? null);
+      
+      // Definition now actively fetches state, but let's also do a separate 
+      // state fetch for maximum reliability
+      this.refreshDeviceState();
     } catch (err: any) {
       console.error('Error loading definition:', err);
       // Don't set error - definition is optional
     } finally {
       this.loadingDefinition.set(false);
+    }
+  }
+
+  /**
+   * Actively request the current device state from Zigbee2MQTT.
+   * This is more reliable than relying on cached/retained MQTT messages.
+   */
+  async refreshDeviceState() {
+    const def = this.definition();
+    if (!def) return;
+
+    this.refreshingState.set(true);
+    try {
+      const response = await this.apiService.getDeviceState(this.deviceId()).toPromise();
+      if (response && (response as any).state) {
+        const newState = (response as any).state;
+        
+        // Merge the fresh state into the definition
+        const updatedDef = DeviceDefinition.fromJS({
+          ...def.toJSON(),
+          currentState: { ...def.currentState, ...newState }
+        });
+        this.definition.set(updatedDef);
+        console.log('Device state refreshed:', newState);
+      }
+    } catch (err: any) {
+      console.warn('Could not refresh device state:', err.message);
+      // Don't show error to user - this is a best-effort refresh
+    } finally {
+      this.refreshingState.set(false);
     }
   }
 

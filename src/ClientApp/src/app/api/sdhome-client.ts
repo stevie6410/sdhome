@@ -575,6 +575,120 @@ export class AutomationsApiService {
         }
         return _observableOf(null as any);
     }
+
+    getCompletedTimelines(take: number | undefined): Observable<EndToEndTimeline[]> {
+        let url_ = this.baseUrl + "/api/automations/e2e/completed?";
+        if (take === null)
+            throw new globalThis.Error("The parameter 'take' cannot be null.");
+        else if (take !== undefined)
+            url_ += "take=" + encodeURIComponent("" + take) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetCompletedTimelines(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetCompletedTimelines(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<EndToEndTimeline[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<EndToEndTimeline[]>;
+        }));
+    }
+
+    protected processGetCompletedTimelines(response: HttpResponseBase): Observable<EndToEndTimeline[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(EndToEndTimeline.fromJS(item));
+            }
+            else {
+                result200 = null as any;
+            }
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    getPendingTimelines(): Observable<EndToEndTimeline[]> {
+        let url_ = this.baseUrl + "/api/automations/e2e/pending";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetPendingTimelines(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetPendingTimelines(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<EndToEndTimeline[]>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<EndToEndTimeline[]>;
+        }));
+    }
+
+    protected processGetPendingTimelines(response: HttpResponseBase): Observable<EndToEndTimeline[]> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(EndToEndTimeline.fromJS(item));
+            }
+            else {
+                result200 = null as any;
+            }
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
 }
 
 @Injectable({
@@ -1198,6 +1312,66 @@ export class DevicesApiService {
         return _observableOf(null as any);
     }
 
+    getDeviceState(deviceId: string): Observable<{ [key: string]: any; }> {
+        let url_ = this.baseUrl + "/api/Devices/{deviceId}/state";
+        if (deviceId === undefined || deviceId === null)
+            throw new globalThis.Error("The parameter 'deviceId' must be defined.");
+        url_ = url_.replace("{deviceId}", encodeURIComponent("" + deviceId));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetDeviceState(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetDeviceState(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<{ [key: string]: any; }>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<{ [key: string]: any; }>;
+        }));
+    }
+
+    protected processGetDeviceState(response: HttpResponseBase): Observable<{ [key: string]: any; }> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (resultData200) {
+                result200 = {} as any;
+                for (let key in resultData200) {
+                    if (resultData200.hasOwnProperty(key))
+                        (result200 as any)![key] = resultData200[key] !== undefined ? resultData200[key] : null as any;
+                }
+            }
+            else {
+                result200 = null as any;
+            }
+            return _observableOf(result200);
+            }));
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
     renameDevice(deviceId: string, request: RenameDeviceRequest): Observable<Device> {
         let url_ = this.baseUrl + "/api/Devices/{deviceId}/rename";
         if (deviceId === undefined || deviceId === null)
@@ -1629,6 +1803,54 @@ export class DevicesApiService {
                 fileName = fileNameMatch && fileNameMatch.length > 1 ? fileNameMatch[1] : undefined;
             }
             return _observableOf({ fileName: fileName, data: responseBlob as any, status: status, headers: _headers });
+        } else if (status !== 200 && status !== 204) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            }));
+        }
+        return _observableOf(null as any);
+    }
+
+    getNetworkMap(): Observable<ZigbeeNetworkMap> {
+        let url_ = this.baseUrl + "/api/Devices/network-map";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_ : any = {
+            observe: "response",
+            responseType: "blob",
+            headers: new HttpHeaders({
+                "Accept": "application/json"
+            })
+        };
+
+        return this.http.request("get", url_, options_).pipe(_observableMergeMap((response_ : any) => {
+            return this.processGetNetworkMap(response_);
+        })).pipe(_observableCatch((response_: any) => {
+            if (response_ instanceof HttpResponseBase) {
+                try {
+                    return this.processGetNetworkMap(response_ as any);
+                } catch (e) {
+                    return _observableThrow(e) as any as Observable<ZigbeeNetworkMap>;
+                }
+            } else
+                return _observableThrow(response_) as any as Observable<ZigbeeNetworkMap>;
+        }));
+    }
+
+    protected processGetNetworkMap(response: HttpResponseBase): Observable<ZigbeeNetworkMap> {
+        const status = response.status;
+        const responseBlob =
+            response instanceof HttpResponse ? response.body :
+            (response as any).error instanceof Blob ? (response as any).error : undefined;
+
+        let _headers: any = {}; if (response.headers) { for (let key of response.headers.keys()) { _headers[key] = response.headers.get(key); }}
+        if (status === 200) {
+            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = ZigbeeNetworkMap.fromJS(resultData200);
+            return _observableOf(result200);
+            }));
         } else if (status !== 200 && status !== 204) {
             return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
@@ -3158,6 +3380,8 @@ export enum TriggerType {
     Sunset = 3,
     SensorThreshold = 4,
     Manual = 5,
+    TriggerEvent = 6,
+    SensorReading = 7,
 }
 
 export enum ComparisonOperator {
@@ -3937,6 +4161,178 @@ export interface IAutomationActionResult {
     durationMs?: number;
 }
 
+export class EndToEndTimeline implements IEndToEndTimeline {
+    id?: string;
+    triggerDeviceId?: string;
+    targetDeviceId?: string | undefined;
+    automationName?: string | undefined;
+    startedAtUtc?: Date;
+    completedAtUtc?: Date | undefined;
+    totalE2EMs?: number | undefined;
+    stages?: EndToEndStages;
+    pipelineSnapshot?: PipelineStagesSnapshot | undefined;
+    isComplete?: boolean;
+
+    constructor(data?: IEndToEndTimeline) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.triggerDeviceId = _data["triggerDeviceId"];
+            this.targetDeviceId = _data["targetDeviceId"];
+            this.automationName = _data["automationName"];
+            this.startedAtUtc = _data["startedAtUtc"] ? new Date(_data["startedAtUtc"].toString()) : undefined as any;
+            this.completedAtUtc = _data["completedAtUtc"] ? new Date(_data["completedAtUtc"].toString()) : undefined as any;
+            this.totalE2EMs = _data["totalE2EMs"];
+            this.stages = _data["stages"] ? EndToEndStages.fromJS(_data["stages"]) : undefined as any;
+            this.pipelineSnapshot = _data["pipelineSnapshot"] ? PipelineStagesSnapshot.fromJS(_data["pipelineSnapshot"]) : undefined as any;
+            this.isComplete = _data["isComplete"];
+        }
+    }
+
+    static fromJS(data: any): EndToEndTimeline {
+        data = typeof data === 'object' ? data : {};
+        let result = new EndToEndTimeline();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["triggerDeviceId"] = this.triggerDeviceId;
+        data["targetDeviceId"] = this.targetDeviceId;
+        data["automationName"] = this.automationName;
+        data["startedAtUtc"] = this.startedAtUtc ? this.startedAtUtc.toISOString() : undefined as any;
+        data["completedAtUtc"] = this.completedAtUtc ? this.completedAtUtc.toISOString() : undefined as any;
+        data["totalE2EMs"] = this.totalE2EMs;
+        data["stages"] = this.stages ? this.stages.toJSON() : undefined as any;
+        data["pipelineSnapshot"] = this.pipelineSnapshot ? this.pipelineSnapshot.toJSON() : undefined as any;
+        data["isComplete"] = this.isComplete;
+        return data;
+    }
+}
+
+export interface IEndToEndTimeline {
+    id?: string;
+    triggerDeviceId?: string;
+    targetDeviceId?: string | undefined;
+    automationName?: string | undefined;
+    startedAtUtc?: Date;
+    completedAtUtc?: Date | undefined;
+    totalE2EMs?: number | undefined;
+    stages?: EndToEndStages;
+    pipelineSnapshot?: PipelineStagesSnapshot | undefined;
+    isComplete?: boolean;
+}
+
+export class EndToEndStages implements IEndToEndStages {
+    signalReceivedMs?: number | undefined;
+    parseAndDbMs?: number | undefined;
+    automationLookupMs?: number | undefined;
+    actionExecutionMs?: number | undefined;
+    targetDeviceResponseMs?: number | undefined;
+    estimatedRadioOverheadMs?: number | undefined;
+
+    constructor(data?: IEndToEndStages) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.signalReceivedMs = _data["signalReceivedMs"];
+            this.parseAndDbMs = _data["parseAndDbMs"];
+            this.automationLookupMs = _data["automationLookupMs"];
+            this.actionExecutionMs = _data["actionExecutionMs"];
+            this.targetDeviceResponseMs = _data["targetDeviceResponseMs"];
+            this.estimatedRadioOverheadMs = _data["estimatedRadioOverheadMs"];
+        }
+    }
+
+    static fromJS(data: any): EndToEndStages {
+        data = typeof data === 'object' ? data : {};
+        let result = new EndToEndStages();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["signalReceivedMs"] = this.signalReceivedMs;
+        data["parseAndDbMs"] = this.parseAndDbMs;
+        data["automationLookupMs"] = this.automationLookupMs;
+        data["actionExecutionMs"] = this.actionExecutionMs;
+        data["targetDeviceResponseMs"] = this.targetDeviceResponseMs;
+        data["estimatedRadioOverheadMs"] = this.estimatedRadioOverheadMs;
+        return data;
+    }
+}
+
+export interface IEndToEndStages {
+    signalReceivedMs?: number | undefined;
+    parseAndDbMs?: number | undefined;
+    automationLookupMs?: number | undefined;
+    actionExecutionMs?: number | undefined;
+    targetDeviceResponseMs?: number | undefined;
+    estimatedRadioOverheadMs?: number | undefined;
+}
+
+export class PipelineStagesSnapshot implements IPipelineStagesSnapshot {
+    parseMs?: number;
+    databaseMs?: number;
+    broadcastMs?: number;
+
+    constructor(data?: IPipelineStagesSnapshot) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.parseMs = _data["parseMs"];
+            this.databaseMs = _data["databaseMs"];
+            this.broadcastMs = _data["broadcastMs"];
+        }
+    }
+
+    static fromJS(data: any): PipelineStagesSnapshot {
+        data = typeof data === 'object' ? data : {};
+        let result = new PipelineStagesSnapshot();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["parseMs"] = this.parseMs;
+        data["databaseMs"] = this.databaseMs;
+        data["broadcastMs"] = this.broadcastMs;
+        return data;
+    }
+}
+
+export interface IPipelineStagesSnapshot {
+    parseMs?: number;
+    databaseMs?: number;
+    broadcastMs?: number;
+}
+
 export class Scene implements IScene {
     id?: string;
     name?: string;
@@ -4161,6 +4557,7 @@ export class Device implements IDevice {
     attributes?: { [key: string]: any; };
     lastSeen?: Date | undefined;
     isAvailable?: boolean;
+    linkQuality?: number | undefined;
     createdAt?: Date;
     updatedAt?: Date;
 
@@ -4204,6 +4601,7 @@ export class Device implements IDevice {
             }
             this.lastSeen = _data["lastSeen"] ? new Date(_data["lastSeen"].toString()) : undefined as any;
             this.isAvailable = _data["isAvailable"];
+            this.linkQuality = _data["linkQuality"];
             this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : undefined as any;
             this.updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : undefined as any;
         }
@@ -4247,6 +4645,7 @@ export class Device implements IDevice {
         }
         data["lastSeen"] = this.lastSeen ? this.lastSeen.toISOString() : undefined as any;
         data["isAvailable"] = this.isAvailable;
+        data["linkQuality"] = this.linkQuality;
         data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : undefined as any;
         data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : undefined as any;
         return data;
@@ -4273,6 +4672,7 @@ export interface IDevice {
     attributes?: { [key: string]: any; };
     lastSeen?: Date | undefined;
     isAvailable?: boolean;
+    linkQuality?: number | undefined;
     createdAt?: Date;
     updatedAt?: Date;
 }
@@ -4806,6 +5206,208 @@ export class StopPairingRequest implements IStopPairingRequest {
 
 export interface IStopPairingRequest {
     pairingId?: string;
+}
+
+export class ZigbeeNetworkMap implements IZigbeeNetworkMap {
+    nodes?: ZigbeeNode[];
+    links?: ZigbeeLink[];
+    generatedAt?: Date;
+
+    constructor(data?: IZigbeeNetworkMap) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            if (Array.isArray(_data["nodes"])) {
+                this.nodes = [] as any;
+                for (let item of _data["nodes"])
+                    this.nodes!.push(ZigbeeNode.fromJS(item));
+            }
+            if (Array.isArray(_data["links"])) {
+                this.links = [] as any;
+                for (let item of _data["links"])
+                    this.links!.push(ZigbeeLink.fromJS(item));
+            }
+            this.generatedAt = _data["generatedAt"] ? new Date(_data["generatedAt"].toString()) : undefined as any;
+        }
+    }
+
+    static fromJS(data: any): ZigbeeNetworkMap {
+        data = typeof data === 'object' ? data : {};
+        let result = new ZigbeeNetworkMap();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        if (Array.isArray(this.nodes)) {
+            data["nodes"] = [];
+            for (let item of this.nodes)
+                data["nodes"].push(item ? item.toJSON() : undefined as any);
+        }
+        if (Array.isArray(this.links)) {
+            data["links"] = [];
+            for (let item of this.links)
+                data["links"].push(item ? item.toJSON() : undefined as any);
+        }
+        data["generatedAt"] = this.generatedAt ? this.generatedAt.toISOString() : undefined as any;
+        return data;
+    }
+}
+
+export interface IZigbeeNetworkMap {
+    nodes?: ZigbeeNode[];
+    links?: ZigbeeLink[];
+    generatedAt?: Date;
+}
+
+export class ZigbeeNode implements IZigbeeNode {
+    ieeeAddress?: string;
+    friendlyName?: string;
+    networkAddress?: number;
+    type?: ZigbeeDeviceType;
+    manufacturer?: string | undefined;
+    model?: string | undefined;
+    modelId?: string | undefined;
+    mainsPowered?: boolean;
+    linkQuality?: number | undefined;
+    lastSeen?: Date | undefined;
+    imageUrl?: string | undefined;
+    x?: number | undefined;
+    y?: number | undefined;
+
+    constructor(data?: IZigbeeNode) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.ieeeAddress = _data["ieeeAddress"];
+            this.friendlyName = _data["friendlyName"];
+            this.networkAddress = _data["networkAddress"];
+            this.type = _data["type"];
+            this.manufacturer = _data["manufacturer"];
+            this.model = _data["model"];
+            this.modelId = _data["modelId"];
+            this.mainsPowered = _data["mainsPowered"];
+            this.linkQuality = _data["linkQuality"];
+            this.lastSeen = _data["lastSeen"] ? new Date(_data["lastSeen"].toString()) : undefined as any;
+            this.imageUrl = _data["imageUrl"];
+            this.x = _data["x"];
+            this.y = _data["y"];
+        }
+    }
+
+    static fromJS(data: any): ZigbeeNode {
+        data = typeof data === 'object' ? data : {};
+        let result = new ZigbeeNode();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["ieeeAddress"] = this.ieeeAddress;
+        data["friendlyName"] = this.friendlyName;
+        data["networkAddress"] = this.networkAddress;
+        data["type"] = this.type;
+        data["manufacturer"] = this.manufacturer;
+        data["model"] = this.model;
+        data["modelId"] = this.modelId;
+        data["mainsPowered"] = this.mainsPowered;
+        data["linkQuality"] = this.linkQuality;
+        data["lastSeen"] = this.lastSeen ? this.lastSeen.toISOString() : undefined as any;
+        data["imageUrl"] = this.imageUrl;
+        data["x"] = this.x;
+        data["y"] = this.y;
+        return data;
+    }
+}
+
+export interface IZigbeeNode {
+    ieeeAddress?: string;
+    friendlyName?: string;
+    networkAddress?: number;
+    type?: ZigbeeDeviceType;
+    manufacturer?: string | undefined;
+    model?: string | undefined;
+    modelId?: string | undefined;
+    mainsPowered?: boolean;
+    linkQuality?: number | undefined;
+    lastSeen?: Date | undefined;
+    imageUrl?: string | undefined;
+    x?: number | undefined;
+    y?: number | undefined;
+}
+
+export enum ZigbeeDeviceType {
+    Coordinator = 0,
+    Router = 1,
+    EndDevice = 2,
+}
+
+export class ZigbeeLink implements IZigbeeLink {
+    sourceIeeeAddress?: string;
+    targetIeeeAddress?: string;
+    linkQuality?: number;
+    depth?: number | undefined;
+    relationship?: string | undefined;
+
+    constructor(data?: IZigbeeLink) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (this as any)[property] = (data as any)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.sourceIeeeAddress = _data["sourceIeeeAddress"];
+            this.targetIeeeAddress = _data["targetIeeeAddress"];
+            this.linkQuality = _data["linkQuality"];
+            this.depth = _data["depth"];
+            this.relationship = _data["relationship"];
+        }
+    }
+
+    static fromJS(data: any): ZigbeeLink {
+        data = typeof data === 'object' ? data : {};
+        let result = new ZigbeeLink();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["sourceIeeeAddress"] = this.sourceIeeeAddress;
+        data["targetIeeeAddress"] = this.targetIeeeAddress;
+        data["linkQuality"] = this.linkQuality;
+        data["depth"] = this.depth;
+        data["relationship"] = this.relationship;
+        return data;
+    }
+}
+
+export interface IZigbeeLink {
+    sourceIeeeAddress?: string;
+    targetIeeeAddress?: string;
+    linkQuality?: number;
+    depth?: number | undefined;
+    relationship?: string | undefined;
 }
 
 export class MqttPublishRequest implements IMqttPublishRequest {

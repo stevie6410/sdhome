@@ -79,4 +79,58 @@ public class SignalsHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"pairing:{pairingId}");
         _logger.LogInformation("Client {ConnectionId} unsubscribed from pairing {PairingId}", Context.ConnectionId, pairingId);
     }
+
+    /// <summary>
+    /// Subscribe to automation log events for a specific automation
+    /// </summary>
+    public async Task SubscribeToAutomation(string automationId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"automation:{automationId}");
+        _logger.LogInformation("Client {ConnectionId} subscribed to automation {AutomationId}", Context.ConnectionId, automationId);
+    }
+
+    /// <summary>
+    /// Unsubscribe from automation log events
+    /// </summary>
+    public async Task UnsubscribeFromAutomation(string automationId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"automation:{automationId}");
+        _logger.LogInformation("Client {ConnectionId} unsubscribed from automation {AutomationId}", Context.ConnectionId, automationId);
+    }
+
+    /// <summary>
+    /// Subscribe to all automation log events
+    /// </summary>
+    public async Task SubscribeToAllAutomations()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, "automations:all");
+        _logger.LogInformation("Client {ConnectionId} subscribed to all automations", Context.ConnectionId);
+    }
+
+    /// <summary>
+    /// Unsubscribe from all automation log events
+    /// </summary>
+    public async Task UnsubscribeFromAllAutomations()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, "automations:all");
+        _logger.LogInformation("Client {ConnectionId} unsubscribed from all automations", Context.ConnectionId);
+    }
+
+    /// <summary>
+    /// Subscribe to pipeline timeline events for latency monitoring
+    /// </summary>
+    public async Task SubscribeToPipelineTimelines()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, "pipelines:all");
+        _logger.LogInformation("Client {ConnectionId} subscribed to pipeline timelines", Context.ConnectionId);
+    }
+
+    /// <summary>
+    /// Unsubscribe from pipeline timeline events
+    /// </summary>
+    public async Task UnsubscribeFromPipelineTimelines()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, "pipelines:all");
+        _logger.LogInformation("Client {ConnectionId} unsubscribed from pipeline timelines", Context.ConnectionId);
+    }
 }

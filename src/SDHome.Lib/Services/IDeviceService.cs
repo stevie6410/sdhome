@@ -15,10 +15,14 @@ public interface IDeviceService
     
     // Device definition and state
     Task<DeviceDefinition?> GetDeviceDefinitionAsync(string deviceId);
+    Task<Dictionary<string, object?>> GetDeviceStateAsync(string deviceId);
     Task SetDeviceStateAsync(string deviceId, Dictionary<string, object> state);
     
     // Pairing methods
     Task<string> StartPairingModeAsync(int durationSeconds, IRealtimeEventBroadcaster broadcaster, CancellationToken cancellationToken = default);
     Task StopPairingModeAsync(string pairingId, IRealtimeEventBroadcaster broadcaster);
     Task<bool> IsPairingActiveAsync();
+    
+    // Network map
+    Task<ZigbeeNetworkMap> GetNetworkMapAsync();
 }

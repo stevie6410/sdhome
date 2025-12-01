@@ -34,4 +34,13 @@
         public int Port { get; set; } = 5050;
     }
 
+    public class DeviceStateSyncOptions
+    {
+        /// <summary>
+        /// Interval in seconds between active state polling for all devices.
+        /// Set to 0 to disable periodic polling (only real-time updates).
+        /// Default is 300 seconds (5 minutes).
+        /// </summary>
+        public int PollIntervalSeconds { get; set; } = 300;
+    }
 }

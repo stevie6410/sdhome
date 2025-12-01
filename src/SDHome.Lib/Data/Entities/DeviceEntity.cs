@@ -49,6 +49,12 @@ public class DeviceEntity
     public string Attributes { get; set; } = "{}";
     public DateTime? LastSeen { get; set; }
     public bool IsAvailable { get; set; }
+    
+    /// <summary>
+    /// Zigbee link quality indicator (0-255). Higher is better.
+    /// </summary>
+    public int? LinkQuality { get; set; }
+    
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -80,6 +86,7 @@ public class DeviceEntity
             Attributes = JsonSerializer.Deserialize<Dictionary<string, object>>(Attributes) ?? [],
             LastSeen = LastSeen,
             IsAvailable = IsAvailable,
+            LinkQuality = LinkQuality,
             CreatedAt = CreatedAt,
             UpdatedAt = UpdatedAt
         };
@@ -107,6 +114,7 @@ public class DeviceEntity
             Attributes = JsonSerializer.Serialize(model.Attributes),
             LastSeen = model.LastSeen,
             IsAvailable = model.IsAvailable,
+            LinkQuality = model.LinkQuality,
             CreatedAt = model.CreatedAt,
             UpdatedAt = model.UpdatedAt
         };

@@ -32,6 +32,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/devices/devices.component').then(m => m.DevicesComponent)
       },
       {
+        path: 'devices/network-map',
+        loadComponent: () => import('./features/devices/zigbee-network-map/zigbee-network-map.component').then(m => m.ZigbeeNetworkMapComponent)
+      },
+      {
         path: 'devices/:deviceId',
         loadComponent: () => import('./features/devices/device-detail/device-detail.component').then(m => m.DeviceDetailComponent)
       },

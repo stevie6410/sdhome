@@ -11,7 +11,11 @@ public enum TriggerType
     Sunrise,          // At sunrise (with optional offset)
     Sunset,           // At sunset (with optional offset)
     SensorThreshold,  // When sensor exceeds/falls below threshold
-    Manual            // Triggered manually via UI/API
+    Manual,           // Triggered manually via UI/API
+    
+    // First-party trigger event types
+    TriggerEvent,     // React to TriggerEvent (button press, motion, contact, etc.)
+    SensorReading     // React to SensorReading (temperature, humidity, etc.)
 }
 
 public enum ConditionType

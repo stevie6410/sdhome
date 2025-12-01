@@ -37,12 +37,14 @@ builder.Services.AddOpenApiDocument(options =>
 builder.Services.Configure<MqttOptions>(builder.Configuration.GetSection("Signals:Mqtt"));
 builder.Services.Configure<MsSQLOptions>(builder.Configuration.GetSection("Signals:MSSQL"));
 builder.Services.Configure<WebhookOptions>(builder.Configuration.GetSection("Signals:Webhooks"));
+builder.Services.Configure<DeviceStateSyncOptions>(builder.Configuration.GetSection("Signals:DeviceStateSync"));
 builder.Services.Configure<LoggingOptions>(builder.Configuration.GetSection("Logging"));
 builder.Services.Configure<MetricsOptions>(builder.Configuration.GetSection("Metrics"));
 
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSignalR();
+builder.Services.AddMemoryCache();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
@@ -61,9 +63,26 @@ builder.Services.AddScoped<DatabaseSeeder>();
 // SignalR real-time event broadcaster
 builder.Services.AddSingleton<IRealtimeEventBroadcaster, SignalREventBroadcaster>();
 
+// End-to-end latency tracker
+builder.Services.AddSingleton<IEndToEndLatencyTracker, EndToEndLatencyTracker>();
+
 // HttpClient for webhook calls (used by SignalsService and AutomationEngine)
 builder.Services.AddHttpClient<ISignalsService, SignalsService>();
-builder.Services.AddHttpClient<AutomationEngine>();
+
+// Automation Engine - register as singleton so it can be injected as IAutomationEngine
+// Use a factory to properly inject HttpClient
+builder.Services.AddHttpClient("AutomationEngine");
+builder.Services.AddSingleton<AutomationEngine>(sp =>
+{
+    var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+    var logger = sp.GetRequiredService<ILogger<AutomationEngine>>();
+    var broadcaster = sp.GetRequiredService<IRealtimeEventBroadcaster>();
+    var e2eTracker = sp.GetRequiredService<IEndToEndLatencyTracker>();
+    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+    var httpClient = httpClientFactory.CreateClient("AutomationEngine");
+    return new AutomationEngine(scopeFactory, logger, broadcaster, e2eTracker, httpClient);
+});
+builder.Services.AddSingleton<IAutomationEngine>(sp => sp.GetRequiredService<AutomationEngine>());
 
 // Health Checks
 builder.Services.AddHealthChecks()
@@ -79,13 +98,24 @@ if (mqttOptions?.Enabled == true)
         var factory = new MQTTnet.MqttClientFactory();
         return factory.CreateMqttClient();
     });
+    
+    // Persistent MQTT publisher for fast command execution
+    builder.Services.AddSingleton<MqttPublisher>();
+    builder.Services.AddSingleton<IMqttPublisher>(sp => sp.GetRequiredService<MqttPublisher>());
 }
 
 // Only add background workers if not in NSwag environment
 if (!builder.Environment.IsEnvironment("NSwag"))
 {
     builder.Services.AddHostedService<SignalsMqttWorker>();
-    builder.Services.AddHostedService<AutomationEngine>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<AutomationEngine>());
+    builder.Services.AddHostedService<DeviceStateSyncWorker>();
+    
+    // Start the MQTT publisher if enabled
+    if (mqttOptions?.Enabled == true)
+    {
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<MqttPublisher>());
+    }
 }
 
 var app = builder.Build();

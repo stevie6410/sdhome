@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using SDHome.Lib.Data;
 using SDHome.Lib.Data.Entities;
@@ -33,13 +34,24 @@ public interface IAutomationService
     Task<List<AutomationRuleEntity>> GetRulesForDeviceTriggerAsync(string deviceId, string property);
     Task<List<AutomationRuleEntity>> GetTimeTriggerRulesAsync();
     Task<List<AutomationRuleEntity>> GetSunTriggerRulesAsync(string sunEvent);
+    
+    // First-party trigger/reading support
+    Task<List<AutomationRuleEntity>> GetRulesForTriggerEventAsync(string deviceId, string triggerType, string? triggerSubType);
+    Task<List<AutomationRuleEntity>> GetRulesForSensorReadingAsync(string deviceId, string metric);
+    
+    // Cache management
+    void InvalidateRulesCache();
 }
 
 public class AutomationService(
     SignalsDbContext db,
     IDeviceService deviceService,
+    IMemoryCache cache,
     ILogger<AutomationService> logger) : IAutomationService
 {
+    private const string RulesCacheKey = "AutomationRules_All";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+    
     // ===== Automation Rules =====
     
     public async Task<List<AutomationSummary>> GetAutomationSummariesAsync()
@@ -147,6 +159,7 @@ public class AutomationService(
         db.AutomationRules.Add(entity);
         await db.SaveChangesAsync();
         
+        InvalidateRulesCache();
         logger.LogInformation("Created automation rule: {Name} (ID: {Id})", entity.Name, entity.Id);
         
         return entity.ToModel();
@@ -154,10 +167,13 @@ public class AutomationService(
     
     public async Task<AutomationRule> UpdateAutomationAsync(Guid id, UpdateAutomationRequest request)
     {
+        // First, delete existing child entities directly from the database
+        await db.AutomationTriggers.Where(t => t.AutomationRuleId == id).ExecuteDeleteAsync();
+        await db.AutomationConditions.Where(c => c.AutomationRuleId == id).ExecuteDeleteAsync();
+        await db.AutomationActions.Where(a => a.AutomationRuleId == id).ExecuteDeleteAsync();
+        
+        // Now load the parent entity (without the deleted children)
         var entity = await db.AutomationRules
-            .Include(r => r.Triggers)
-            .Include(r => r.Conditions)
-            .Include(r => r.Actions)
             .FirstOrDefaultAsync(r => r.Id == id)
             ?? throw new KeyNotFoundException($"Automation rule {id} not found");
         
@@ -171,12 +187,10 @@ public class AutomationService(
         entity.CooldownSeconds = request.CooldownSeconds;
         entity.UpdatedAt = DateTime.UtcNow;
         
-        // Replace triggers
-        db.AutomationTriggers.RemoveRange(entity.Triggers);
-        entity.Triggers.Clear();
+        // Add new triggers
         foreach (var (trigger, index) in request.Triggers.Select((t, i) => (t, i)))
         {
-            entity.Triggers.Add(new AutomationTriggerEntity
+            db.AutomationTriggers.Add(new AutomationTriggerEntity
             {
                 Id = Guid.NewGuid(),
                 AutomationRuleId = entity.Id,
@@ -192,12 +206,10 @@ public class AutomationService(
             });
         }
         
-        // Replace conditions
-        db.AutomationConditions.RemoveRange(entity.Conditions);
-        entity.Conditions.Clear();
+        // Add new conditions
         foreach (var (condition, index) in request.Conditions.Select((c, i) => (c, i)))
         {
-            entity.Conditions.Add(new AutomationConditionEntity
+            db.AutomationConditions.Add(new AutomationConditionEntity
             {
                 Id = Guid.NewGuid(),
                 AutomationRuleId = entity.Id,
@@ -214,12 +226,10 @@ public class AutomationService(
             });
         }
         
-        // Replace actions
-        db.AutomationActions.RemoveRange(entity.Actions);
-        entity.Actions.Clear();
+        // Add new actions
         foreach (var (action, index) in request.Actions.Select((a, i) => (a, i)))
         {
-            entity.Actions.Add(new AutomationActionEntity
+            db.AutomationActions.Add(new AutomationActionEntity
             {
                 Id = Guid.NewGuid(),
                 AutomationRuleId = entity.Id,
@@ -240,7 +250,15 @@ public class AutomationService(
         
         await db.SaveChangesAsync();
         
+        InvalidateRulesCache();
         logger.LogInformation("Updated automation rule: {Name} (ID: {Id})", entity.Name, entity.Id);
+        
+        // Reload with children to return complete model
+        entity = await db.AutomationRules
+            .Include(r => r.Triggers)
+            .Include(r => r.Conditions)
+            .Include(r => r.Actions)
+            .FirstAsync(r => r.Id == id);
         
         return entity.ToModel();
     }
@@ -253,6 +271,7 @@ public class AutomationService(
         db.AutomationRules.Remove(entity);
         await db.SaveChangesAsync();
         
+        InvalidateRulesCache();
         logger.LogInformation("Deleted automation rule: {Name} (ID: {Id})", entity.Name, entity.Id);
     }
     
@@ -270,6 +289,7 @@ public class AutomationService(
         
         await db.SaveChangesAsync();
         
+        InvalidateRulesCache();
         logger.LogInformation("Toggled automation rule: {Name} -> {Enabled}", entity.Name, enabled);
         
         return entity.ToModel();
@@ -410,46 +430,99 @@ public class AutomationService(
         }
     }
     
-    // ===== Rule Matching =====
+    // ===== Rule Matching (Cached) =====
     
-    public async Task<List<AutomationRuleEntity>> GetRulesForDeviceTriggerAsync(string deviceId, string property)
+    /// <summary>
+    /// Get all enabled rules from cache or database
+    /// </summary>
+    private async Task<List<AutomationRuleEntity>> GetCachedRulesAsync()
     {
-        return await db.AutomationRules
+        if (cache.TryGetValue(RulesCacheKey, out List<AutomationRuleEntity>? cachedRules) && cachedRules != null)
+        {
+            return cachedRules;
+        }
+        
+        logger.LogDebug("Loading automation rules into cache");
+        var rules = await db.AutomationRules
             .AsNoTracking()
             .Include(r => r.Triggers)
             .Include(r => r.Conditions)
             .Include(r => r.Actions)
             .Where(r => r.IsEnabled)
+            .ToListAsync();
+        
+        cache.Set(RulesCacheKey, rules, CacheDuration);
+        logger.LogInformation("Cached {Count} enabled automation rules", rules.Count);
+        
+        return rules;
+    }
+    
+    public void InvalidateRulesCache()
+    {
+        cache.Remove(RulesCacheKey);
+        logger.LogDebug("Automation rules cache invalidated");
+    }
+    
+    public async Task<List<AutomationRuleEntity>> GetRulesForDeviceTriggerAsync(string deviceId, string property)
+    {
+        var rules = await GetCachedRulesAsync();
+        return rules
             .Where(r => r.Triggers.Any(t => 
                 t.TriggerType == "DeviceState" && 
                 t.DeviceId == deviceId && 
                 (t.Property == property || t.Property == null)))
-            .ToListAsync();
+            .ToList();
     }
     
     public async Task<List<AutomationRuleEntity>> GetTimeTriggerRulesAsync()
     {
-        return await db.AutomationRules
-            .AsNoTracking()
-            .Include(r => r.Triggers)
-            .Include(r => r.Conditions)
-            .Include(r => r.Actions)
-            .Where(r => r.IsEnabled)
+        var rules = await GetCachedRulesAsync();
+        return rules
             .Where(r => r.Triggers.Any(t => t.TriggerType == "Time"))
-            .ToListAsync();
+            .ToList();
     }
     
     public async Task<List<AutomationRuleEntity>> GetSunTriggerRulesAsync(string sunEvent)
     {
-        return await db.AutomationRules
-            .AsNoTracking()
-            .Include(r => r.Triggers)
-            .Include(r => r.Conditions)
-            .Include(r => r.Actions)
-            .Where(r => r.IsEnabled)
+        var rules = await GetCachedRulesAsync();
+        return rules
             .Where(r => r.Triggers.Any(t => 
                 (t.TriggerType == "Sunrise" || t.TriggerType == "Sunset") && 
                 t.SunEvent == sunEvent))
-            .ToListAsync();
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Get automation rules that should fire for a TriggerEvent (button press, motion, contact, etc.)
+    /// </summary>
+    public async Task<List<AutomationRuleEntity>> GetRulesForTriggerEventAsync(
+        string deviceId, 
+        string triggerType, 
+        string? triggerSubType)
+    {
+        var rules = await GetCachedRulesAsync();
+        return rules
+            .Where(r => r.Triggers.Any(t => 
+                t.TriggerType == "TriggerEvent" && 
+                t.DeviceId == deviceId &&
+                (t.Property == null || t.Property == triggerType) &&
+                (t.Value == null || t.Value == $"\"{triggerSubType}\"")))
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Get automation rules that should fire for a SensorReading (temperature, humidity, etc.)
+    /// </summary>
+    public async Task<List<AutomationRuleEntity>> GetRulesForSensorReadingAsync(
+        string deviceId, 
+        string metric)
+    {
+        var rules = await GetCachedRulesAsync();
+        return rules
+            .Where(r => r.Triggers.Any(t => 
+                t.TriggerType == "SensorReading" && 
+                t.DeviceId == deviceId &&
+                (t.Property == null || t.Property == metric)))
+            .ToList();
     }
 }

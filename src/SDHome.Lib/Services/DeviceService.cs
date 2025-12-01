@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,7 @@ public class DeviceService(
     SignalsDbContext db,
     ILogger<DeviceService> logger,
     IOptions<MqttOptions> mqttOptions,
+    IMqttPublisher? mqttPublisher = null,
     IMqttClient? mqttClient = null) : IDeviceService
 {
     private readonly MqttOptions _mqttOptions = mqttOptions.Value;
@@ -342,6 +344,23 @@ public class DeviceService(
                     logger.LogError(ex, "Error processing device {FriendlyName}", zigbeeDevice.friendly_name);
                 }
             }
+
+            // Fetch state for all devices to populate linkQuality values
+            logger.LogInformation("Fetching state for {Count} devices to populate link quality...", zigbeeDevices.Count);
+            var stateTasks = zigbeeDevices.Select(async d =>
+            {
+                try
+                {
+                    await GetDeviceStateAsync(d.friendly_name);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogDebug(ex, "Could not fetch state for {DeviceId}", d.friendly_name);
+                }
+            });
+            
+            // Run with limited parallelism to avoid overwhelming MQTT broker
+            await Task.WhenAll(stateTasks);
 
             logger.LogInformation("Device sync completed successfully");
         }
@@ -1007,6 +1026,7 @@ public class DeviceService(
         var baseTopic = _mqttOptions.BaseTopic.TrimEnd('/');
         var devicesTopic = $"{baseTopic}/bridge/devices";
         var stateTopic = $"{baseTopic}/{deviceId}";
+        var getTopic = $"{baseTopic}/{deviceId}/get";
 
         Zigbee2MqttDevice? zigbeeDevice = null;
         Dictionary<string, object?>? currentState = null;
@@ -1038,9 +1058,16 @@ public class DeviceService(
             {
                 try
                 {
-                    currentState = JsonSerializer.Deserialize<Dictionary<string, object?>>(payload,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    // Parse into JsonElement first to handle mixed types properly
+                    using var doc = JsonDocument.Parse(payload);
+                    currentState = new Dictionary<string, object?>();
+                    
+                    foreach (var prop in doc.RootElement.EnumerateObject())
+                    {
+                        currentState[prop.Name] = ParseJsonValue(prop.Value);
+                    }
                     stateReceived.TrySetResult(true);
+                    logger.LogDebug("Received state for {DeviceId} in definition request", deviceId);
                 }
                 catch (Exception ex)
                 {
@@ -1074,8 +1101,20 @@ public class DeviceService(
                 logger.LogWarning("Timeout waiting for device list from Zigbee2MQTT");
             }
 
-            // Also try to get current state (optional - may not be retained)
-            await Task.WhenAny(stateTask, Task.Delay(1000));
+            // Actively request current state instead of relying on retained messages
+            // This is more reliable for getting accurate device state
+            var requestPayload = JsonSerializer.Serialize(new { state = "" });
+            var message = new MqttApplicationMessageBuilder()
+                .WithTopic(getTopic)
+                .WithPayload(requestPayload)
+                .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
+                .Build();
+
+            await client.PublishAsync(message);
+            logger.LogDebug("Sent state request to {Topic} for device definition", getTopic);
+
+            // Wait for state response (with separate timeout)
+            await Task.WhenAny(stateTask, Task.Delay(3000));
         }
         finally
         {
@@ -1233,11 +1272,32 @@ public class DeviceService(
 
     public async Task SetDeviceStateAsync(string deviceId, Dictionary<string, object> state)
     {
+        var totalStart = Stopwatch.GetTimestamp();
+        
         if (!_mqttOptions.Enabled)
         {
             throw new InvalidOperationException("MQTT is disabled in configuration");
         }
 
+        var baseTopic = _mqttOptions.BaseTopic.TrimEnd('/');
+        var setTopic = $"{baseTopic}/{deviceId}/set";
+        var payload = JsonSerializer.Serialize(state);
+
+        logger.LogInformation("Setting device state for {DeviceId}: {Payload}", deviceId, payload);
+
+        // Use persistent publisher if available (much faster - no connection overhead)
+        if (mqttPublisher != null && mqttPublisher.IsConnected)
+        {
+            await mqttPublisher.PublishAsync(setTopic, payload);
+            var totalTime = Stopwatch.GetElapsedTime(totalStart);
+            logger.LogInformation("⏱️ SetDeviceState [{DeviceId}] via Publisher: {Total:F1}ms", 
+                deviceId, totalTime.TotalMilliseconds);
+            return;
+        }
+
+        // Fallback: create ephemeral connection (slower)
+        logger.LogWarning("Using fallback MQTT connection (publisher not available)");
+        var connectStart = Stopwatch.GetTimestamp();
         var factory = new MqttClientFactory();
         using var client = factory.CreateMqttClient();
 
@@ -1249,29 +1309,479 @@ public class DeviceService(
             .Build();
 
         await client.ConnectAsync(options);
+        var connectTime = Stopwatch.GetElapsedTime(connectStart);
 
         try
         {
-            var baseTopic = _mqttOptions.BaseTopic.TrimEnd('/');
-            var setTopic = $"{baseTopic}/{deviceId}/set";
-            var payload = JsonSerializer.Serialize(state);
-
-            logger.LogInformation("Setting device state for {DeviceId}: {Payload}", deviceId, payload);
-
             var message = new MqttApplicationMessageBuilder()
                 .WithTopic(setTopic)
                 .WithPayload(payload)
                 .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
                 .Build();
 
+            var publishStart = Stopwatch.GetTimestamp();
             await client.PublishAsync(message);
+            var publishTime = Stopwatch.GetElapsedTime(publishStart);
 
-            logger.LogInformation("Device state set successfully for {DeviceId}", deviceId);
+            var totalTime = Stopwatch.GetElapsedTime(totalStart);
+            logger.LogInformation(
+                "⏱️ SetDeviceState [{DeviceId}] (fallback) Total: {Total:F1}ms | Connect: {Connect:F1}ms | Publish: {Publish:F1}ms",
+                deviceId, totalTime.TotalMilliseconds, connectTime.TotalMilliseconds, publishTime.TotalMilliseconds);
         }
         finally
         {
             await client.DisconnectAsync();
         }
+    }
+
+    /// <summary>
+    /// Actively request current state from a device via Zigbee2MQTT.
+    /// This sends a GET request and waits for the device to report its state.
+    /// More reliable than waiting for retained messages.
+    /// </summary>
+    public async Task<Dictionary<string, object?>> GetDeviceStateAsync(string deviceId)
+    {
+        var totalStart = Stopwatch.GetTimestamp();
+        
+        if (!_mqttOptions.Enabled)
+        {
+            throw new InvalidOperationException("MQTT is disabled in configuration");
+        }
+
+        var baseTopic = _mqttOptions.BaseTopic.TrimEnd('/');
+        var getTopic = $"{baseTopic}/{deviceId}/get";
+        var stateTopic = $"{baseTopic}/{deviceId}";
+        
+        var factory = new MqttClientFactory();
+        using var client = factory.CreateMqttClient();
+
+        var options = new MqttClientOptionsBuilder()
+            .WithClientId("SDHomeGetState-" + Guid.NewGuid().ToString("N")[..8])
+            .WithTcpServer(_mqttOptions.Host, _mqttOptions.Port)
+            .WithCleanSession()
+            .WithTimeout(TimeSpan.FromSeconds(10))
+            .Build();
+
+        Dictionary<string, object?>? currentState = null;
+        var stateReceived = new TaskCompletionSource<bool>();
+
+        client.ApplicationMessageReceivedAsync += e =>
+        {
+            var topic = e.ApplicationMessage.Topic;
+            if (topic == stateTopic)
+            {
+                try
+                {
+                    var payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                    var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    
+                    // Parse into JsonElement first to handle mixed types properly
+                    using var doc = JsonDocument.Parse(payload);
+                    currentState = new Dictionary<string, object?>();
+                    
+                    foreach (var prop in doc.RootElement.EnumerateObject())
+                    {
+                        currentState[prop.Name] = ParseJsonValue(prop.Value);
+                    }
+                    
+                    stateReceived.TrySetResult(true);
+                    logger.LogDebug("Received state for {DeviceId}: {State}", deviceId, payload);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error parsing device state response for {DeviceId}", deviceId);
+                    stateReceived.TrySetResult(false);
+                }
+            }
+            return Task.CompletedTask;
+        };
+
+        await client.ConnectAsync(options);
+
+        try
+        {
+            // Subscribe to the device's state topic
+            await client.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
+                .WithTopicFilter(stateTopic)
+                .Build());
+
+            // Request all state by sending an empty get request
+            // Zigbee2MQTT will respond with the full device state
+            var requestPayload = JsonSerializer.Serialize(new { state = "" });
+            var message = new MqttApplicationMessageBuilder()
+                .WithTopic(getTopic)
+                .WithPayload(requestPayload)
+                .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
+                .Build();
+
+            await client.PublishAsync(message);
+            logger.LogDebug("Sent state request to {Topic}", getTopic);
+
+            // Wait for response with timeout
+            var timeout = Task.Delay(TimeSpan.FromSeconds(5));
+            var completedTask = await Task.WhenAny(stateReceived.Task, timeout);
+
+            if (completedTask == timeout)
+            {
+                logger.LogWarning("Timeout waiting for state response from {DeviceId}", deviceId);
+            }
+        }
+        finally
+        {
+            await client.DisconnectAsync();
+        }
+
+        var totalTime = Stopwatch.GetElapsedTime(totalStart);
+        logger.LogInformation("⏱️ GetDeviceState [{DeviceId}]: {Total:F1}ms, received: {Received}", 
+            deviceId, totalTime.TotalMilliseconds, currentState != null);
+
+        // Persist linkQuality to the database if received
+        if (currentState != null && currentState.TryGetValue("linkquality", out var lqValue))
+        {
+            int? lq = lqValue switch
+            {
+                long l => (int)l,
+                int i => i,
+                double d => (int)d,
+                _ => null
+            };
+            if (lq.HasValue)
+            {
+                try
+                {
+                    var device = await db.Devices.FindAsync(deviceId);
+                    if (device != null)
+                    {
+                        device.LinkQuality = lq.Value;
+                        device.LastSeen = DateTime.UtcNow;
+                        await db.SaveChangesAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to persist linkQuality for {DeviceId}", deviceId);
+                }
+            }
+        }
+
+        return currentState ?? new Dictionary<string, object?>();
+    }
+
+    private static object? ParseJsonValue(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            JsonValueKind.Object => ParseJsonObject(element),
+            JsonValueKind.Array => ParseJsonArray(element),
+            _ => element.ToString()
+        };
+    }
+
+    private static Dictionary<string, object?> ParseJsonObject(JsonElement element)
+    {
+        var dict = new Dictionary<string, object?>();
+        foreach (var prop in element.EnumerateObject())
+        {
+            dict[prop.Name] = ParseJsonValue(prop.Value);
+        }
+        return dict;
+    }
+
+    private static List<object?> ParseJsonArray(JsonElement element)
+    {
+        var list = new List<object?>();
+        foreach (var item in element.EnumerateArray())
+        {
+            list.Add(ParseJsonValue(item));
+        }
+        return list;
+    }
+
+    #endregion
+
+    #region Network Map
+
+    /// <summary>
+    /// Get the Zigbee network map from Zigbee2MQTT
+    /// </summary>
+    public async Task<ZigbeeNetworkMap> GetNetworkMapAsync()
+    {
+        if (!_mqttOptions.Enabled)
+        {
+            throw new InvalidOperationException("MQTT is disabled in configuration");
+        }
+
+        var baseTopic = _mqttOptions.BaseTopic.TrimEnd('/');
+        var requestTopic = $"{baseTopic}/bridge/request/networkmap";
+        var responseTopic = $"{baseTopic}/bridge/response/networkmap";
+
+        var factory = new MqttClientFactory();
+        using var client = factory.CreateMqttClient();
+
+        var options = new MqttClientOptionsBuilder()
+            .WithClientId("SDHomeNetworkMap-" + Guid.NewGuid().ToString("N")[..8])
+            .WithTcpServer(_mqttOptions.Host, _mqttOptions.Port)
+            .WithCleanSession()
+            .WithTimeout(TimeSpan.FromSeconds(10))
+            .Build();
+
+        // Network map generation can take 60+ seconds on large networks
+        var timeoutSeconds = 120;
+        var tcs = new TaskCompletionSource<ZigbeeNetworkMap>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+        cts.Token.Register(() => tcs.TrySetException(new TimeoutException($"Network map request timed out after {timeoutSeconds} seconds. The Zigbee network scan may take longer on large networks.")));
+
+        client.ApplicationMessageReceivedAsync += e =>
+        {
+            if (e.ApplicationMessage.Topic == responseTopic)
+            {
+                try
+                {
+                    var payload = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                    logger.LogDebug("Received network map response ({Length} bytes)", payload.Length);
+                    
+                    // Parse the outer response envelope
+                    var response = JsonSerializer.Deserialize<NetworkMapResponse>(payload, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    if (response?.Status == "error")
+                    {
+                        var errorMsg = response.Error ?? "Unknown error from Zigbee2MQTT";
+                        logger.LogError("Network map request failed: {Error}", errorMsg);
+                        tcs.TrySetException(new InvalidOperationException($"Zigbee2MQTT error: {errorMsg}"));
+                        return Task.CompletedTask;
+                    }
+
+                    // The 'data' field can be either a string (JSON) or an object
+                    // Zigbee2MQTT returns it as a JSON string that needs to be parsed again
+                    if (response != null && response.Data.ValueKind != JsonValueKind.Undefined && response.Data.ValueKind != JsonValueKind.Null)
+                    {
+                        NetworkMapDataWrapper? dataWrapper = null;
+                        
+                        if (response.Data.ValueKind == JsonValueKind.String)
+                        {
+                            // Data is a JSON string - parse it
+                            var dataString = response.Data.GetString();
+                            if (!string.IsNullOrEmpty(dataString))
+                            {
+                                dataWrapper = JsonSerializer.Deserialize<NetworkMapDataWrapper>(dataString, new JsonSerializerOptions
+                                {
+                                    PropertyNameCaseInsensitive = true
+                                });
+                            }
+                        }
+                        else if (response.Data.ValueKind == JsonValueKind.Object)
+                        {
+                            // Data is already an object
+                            dataWrapper = JsonSerializer.Deserialize<NetworkMapDataWrapper>(response.Data.GetRawText(), new JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true
+                            });
+                        }
+
+                        if (dataWrapper?.Value != null)
+                        {
+                            var networkMap = ParseNetworkMap(dataWrapper.Value);
+                            tcs.TrySetResult(networkMap);
+                        }
+                        else
+                        {
+                            logger.LogWarning("Network map data wrapper has no value. Data kind: {Kind}", response.Data.ValueKind);
+                            tcs.TrySetException(new InvalidOperationException("Invalid network map response - no data.value returned"));
+                        }
+                    }
+                    else
+                    {
+                        logger.LogWarning("Network map response has no data. Response: {Response}", 
+                            payload.Length > 1000 ? payload[..1000] + "..." : payload);
+                        tcs.TrySetException(new InvalidOperationException("Invalid network map response - no data returned"));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to parse network map response");
+                    tcs.TrySetException(ex);
+                }
+            }
+            return Task.CompletedTask;
+        };
+
+        logger.LogInformation("Connecting to MQTT broker at {Host}:{Port} to get network map...", 
+            _mqttOptions.Host, _mqttOptions.Port);
+        
+        try
+        {
+            await client.ConnectAsync(options, cts.Token);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to connect to MQTT broker for network map");
+            throw new InvalidOperationException($"Failed to connect to MQTT broker: {ex.Message}", ex);
+        }
+
+        await client.SubscribeAsync(responseTopic);
+        logger.LogInformation("Subscribed to {Topic}, requesting network map (timeout: {Timeout}s)...", 
+            responseTopic, timeoutSeconds);
+
+        // Request the network map - use 'raw' type which returns structured JSON
+        // routes=true includes routing information
+        var requestPayload = JsonSerializer.Serialize(new { type = "raw", routes = true });
+        var message = new MqttApplicationMessageBuilder()
+            .WithTopic(requestTopic)
+            .WithPayload(requestPayload)
+            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
+            .Build();
+
+        await client.PublishAsync(message);
+        logger.LogInformation("Network map request sent to {Topic}. Waiting for response (this may take up to {Timeout}s on large networks)...", 
+            requestTopic, timeoutSeconds);
+
+        try
+        {
+            return await tcs.Task;
+        }
+        finally
+        {
+            try
+            {
+                await client.DisconnectAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Error disconnecting MQTT client");
+            }
+        }
+    }
+
+    private ZigbeeNetworkMap ParseNetworkMap(NetworkMapData data)
+    {
+        var map = new ZigbeeNetworkMap();
+        
+        // Parse nodes
+        foreach (var node in data.Nodes ?? [])
+        {
+            var zigbeeNode = new ZigbeeNode
+            {
+                IeeeAddress = node.IeeeAddr ?? "",
+                FriendlyName = node.FriendlyName ?? node.IeeeAddr ?? "",
+                NetworkAddress = node.NwkAddr ?? 0,
+                Type = ParseDeviceType(node.Type),
+                Manufacturer = node.Manufacturer,
+                Model = node.Definition?.Model,
+                ModelId = node.ModelId,
+                MainsPowered = node.PowerSource == "Mains (single phase)",
+                LinkQuality = node.Lqi,
+                LastSeen = node.LastSeen.HasValue 
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(node.LastSeen.Value).UtcDateTime 
+                    : null
+            };
+            map.Nodes.Add(zigbeeNode);
+        }
+        
+        // Parse links
+        foreach (var link in data.Links ?? [])
+        {
+            var zigbeeLink = new ZigbeeLink
+            {
+                SourceIeeeAddress = link.Source.IeeeAddr ?? link.SourceIeeeAddr ?? "",
+                TargetIeeeAddress = link.Target.IeeeAddr ?? link.TargetIeeeAddr ?? "",
+                LinkQuality = link.Lqi ?? link.Linkquality ?? 0,
+                Depth = link.Depth,
+                Relationship = link.Relationship?.ToString()
+            };
+            map.Links.Add(zigbeeLink);
+        }
+
+        logger.LogInformation("Parsed network map: {NodeCount} nodes, {LinkCount} links", 
+            map.Nodes.Count, map.Links.Count);
+        
+        return map;
+    }
+
+    private static ZigbeeDeviceType ParseDeviceType(string? type)
+    {
+        return type?.ToLower() switch
+        {
+            "coordinator" => ZigbeeDeviceType.Coordinator,
+            "router" => ZigbeeDeviceType.Router,
+            "enddevice" => ZigbeeDeviceType.EndDevice,
+            _ => ZigbeeDeviceType.EndDevice
+        };
+    }
+
+    // Response DTOs for network map
+    private class NetworkMapResponse
+    {
+        public JsonElement Data { get; set; }
+        public string? Status { get; set; }
+        public string? Error { get; set; }
+    }
+
+    private class NetworkMapDataWrapper
+    {
+        public string? Type { get; set; }
+        public NetworkMapData? Value { get; set; }
+    }
+
+    private class NetworkMapData
+    {
+        public List<NetworkMapNode>? Nodes { get; set; }
+        public List<NetworkMapLink>? Links { get; set; }
+    }
+
+    private class NetworkMapNode
+    {
+        public string? IeeeAddr { get; set; }
+        public string? FriendlyName { get; set; }
+        public int? NwkAddr { get; set; }
+        public string? Type { get; set; }
+        public string? Manufacturer { get; set; }
+        public string? ModelId { get; set; }
+        public string? PowerSource { get; set; }
+        public int? Lqi { get; set; }
+        public long? LastSeen { get; set; }
+        public NetworkMapNodeDefinition? Definition { get; set; }
+    }
+
+    private class NetworkMapNodeDefinition
+    {
+        public string? Model { get; set; }
+        public string? Vendor { get; set; }
+    }
+
+    private class NetworkMapLink
+    {
+        public NetworkMapLinkEndpoint Source { get; set; } = new();
+        public NetworkMapLinkEndpoint Target { get; set; } = new();
+        public int? Lqi { get; set; }
+        public int? Linkquality { get; set; }
+        public int? Depth { get; set; }
+        public int? Relationship { get; set; }
+        public string? SourceIeeeAddr { get; set; }
+        public string? TargetIeeeAddr { get; set; }
+        public int? SourceNwkAddr { get; set; }
+        public List<NetworkMapRoute>? Routes { get; set; }
+    }
+
+    private class NetworkMapRoute
+    {
+        public int? DestinationAddress { get; set; }
+        public int? NextHop { get; set; }
+        public string? Status { get; set; }
+    }
+
+    private class NetworkMapLinkEndpoint
+    {
+        public string? IeeeAddr { get; set; }
+        public int? NetworkAddress { get; set; }
+        public int? NwkAddr { get; set; }
     }
 
     #endregion

@@ -9,6 +9,9 @@
       <h1>{{ isNew() ? 'Create Automation' : 'Edit Automation' }}</h1>
     </div>
     <div class="header-actions">
+      <button class="btn btn-secondary" (click)="copyToJson()" title="Copy automation as JSON">
+        📋 Copy JSON
+      </button>
       <button class="btn btn-secondary" (click)="cancel()" [disabled]="saving()">
         Cancel
       </button>
@@ -838,6 +841,49 @@
           + Add Action
         </button>
       </section>
+
+      <!-- Console Section -->
+      @if (!isNew()) {
+        <section class="editor-section console-section">
+          <div class="section-header-row">
+            <h2 class="section-title">
+              <span class="section-icon">⚡</span>
+              Automation Console
+            </h2>
+            <button class="toggle-btn" (click)="showConsole.set(!showConsole())">
+              {{ showConsole() ? '▼ Hide' : '▶ Show' }}
+            </button>
+          </div>
+
+          @if (showConsole()) {
+            <div class="console-wrapper">
+              <app-automation-console
+                [automationId]="automationId()!"
+                [automationName]="name">
+              </app-automation-console>
+            </div>
+          }
+        </section>
+
+        <!-- Pipeline Latency Section -->
+        <section class="editor-section pipeline-section">
+          <div class="section-header-row">
+            <h2 class="section-title">
+              <span class="section-icon">📊</span>
+              Pipeline Latency
+            </h2>
+            <button class="toggle-btn" (click)="showPipelineTimeline.set(!showPipelineTimeline())">
+              {{ showPipelineTimeline() ? '▼ Hide' : '▶ Show' }}
+            </button>
+          </div>
+
+          @if (showPipelineTimeline()) {
+            <div class="pipeline-wrapper">
+              <app-pipeline-timeline></app-pipeline-timeline>
+            </div>
+          }
+        </section>
+      }
     </div>
   }
 </div>
